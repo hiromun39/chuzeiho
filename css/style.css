@@ -1,0 +1,873 @@
+/* =========================================
+   中筮法 - 和風スタイル
+   墨・朱・金を基調とした落ち着いたデザイン
+   ========================================= */
+
+:root {
+  --sumi: #2c2a26;        /* 墨 */
+  --sumi-light: #4a453e;
+  --shu: #c85c3c;         /* 朱 */
+  --kin: #b8963e;         /* 金 */
+  --washi: #f5f0e6;       /* 和紙 */
+  --washi-dark: #e8e0d0;
+  --text: #3a342b;
+  --text-sub: #6b6257;
+  --hen: #a82b2b;         /* 変爻色 */
+  --good: #2d6a4f;        /* 吉 */
+  --bad: #a82b2b;         /* 凶 */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", serif;
+  background-color: var(--washi);
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(184,150,62,0.04) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(200,92,60,0.04) 0%, transparent 50%);
+  color: var(--text);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+/* ---------- ヘッダー ---------- */
+.header {
+  text-align: center;
+  padding: 40px 20px 30px;
+  border-bottom: 2px solid var(--sumi);
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.header::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 4px;
+  background: var(--shu);
+}
+
+.title {
+  font-size: 2.4rem;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em; /* 字間補正 */
+  color: var(--sumi);
+  font-weight: 700;
+}
+
+.subtitle {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  color: var(--text-sub);
+  letter-spacing: 0.2em;
+}
+
+/* ---------- データステータス ---------- */
+.data-status {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-bottom: 20px;
+}
+
+.data-status.loaded {
+  color: var(--good);
+}
+
+/* ---------- 占的入力 ---------- */
+.fortune-input {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--washi);
+  border: 1px solid var(--washi-dark);
+  border-radius: 6px;
+}
+
+.fortune-input label {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: 0.08em;
+}
+
+.fortune-input .input-note {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-left: 6px;
+}
+
+.fortune-input textarea {
+  width: 100%;
+  min-height: 70px;
+  padding: 10px 12px;
+  border: 1px solid var(--washi-dark);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  background: #fffef9;
+  color: var(--text);
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.fortune-input textarea:focus {
+  outline: none;
+  border-color: var(--shu);
+  box-shadow: 0 0 0 2px rgba(200,92,60,0.1);
+}
+
+.input-counter {
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-top: 6px;
+}
+
+.input-counter.near-limit {
+  color: var(--shu);
+}
+
+/* ---------- セクション ---------- */
+.section {
+  background: #fffef9;
+  border: 1px solid var(--washi-dark);
+  border-radius: 8px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  box-shadow: 0 2px 8px rgba(44,42,38,0.06);
+}
+
+.section h2 {
+  font-size: 1.3rem;
+  color: var(--sumi);
+  border-left: 4px solid var(--shu);
+  padding-left: 12px;
+  margin-bottom: 18px;
+  letter-spacing: 0.15em;
+}
+
+.section h3 {
+  font-size: 1.05rem;
+  color: var(--sumi);
+  margin: 20px 0 10px;
+}
+
+.section p {
+  margin-bottom: 12px;
+}
+
+/* ---------- 説明テーブル ---------- */
+.rule-table {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.rule-table table {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.rule-table th {
+  background: var(--sumi);
+  color: #f5f0e6;
+  padding: 8px 12px;
+  font-weight: normal;
+}
+
+.rule-table td {
+  border: 1px solid var(--washi-dark);
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.rule-table th:first-child {
+  border-radius: 4px 0 0 0;
+}
+
+.hen {
+  color: var(--hen);
+  font-weight: bold;
+}
+
+/* ---------- コインエリア ---------- */
+.coin-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 20px;
+  min-height: 140px;
+  flex-wrap: wrap;
+}
+
+.coins {
+  display: flex;
+  gap: 12px;
+}
+
+.coin {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d4b860, #a88330 70%);
+  border: 3px solid #8a6a20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #5a4a10;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.25), inset 0 2px 4px rgba(255,255,255,0.3);
+  transition: transform 0.1s;
+}
+
+.coin.flipping {
+  animation: coin-flip 0.5s ease-in-out;
+}
+
+.coin.head {
+  background: radial-gradient(circle at 35% 30%, #e8d070, #b8963e 70%);
+}
+
+.coin.tail {
+  background: radial-gradient(circle at 35% 30%, #8a8a80, #5a5a50 70%);
+}
+
+@keyframes coin-flip {
+  0% { transform: rotateY(0deg) scale(1); }
+  50% { transform: rotateY(360deg) scale(0.8); }
+  100% { transform: rotateY(720deg) scale(1); }
+}
+
+.yao-result {
+  font-size: 2.2rem;
+  min-width: 80px;
+  text-align: center;
+  border: 2px solid var(--washi-dark);
+  border-radius: 8px;
+  padding: 8px 16px;
+  background: var(--washi);
+  color: var(--text-sub);
+  transition: all 0.3s;
+}
+
+.yao-result.active {
+  border-color: var(--shu);
+  color: var(--sumi);
+  box-shadow: 0 2px 12px rgba(200,92,60,0.15);
+}
+
+/* ---------- ボタン ---------- */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.1em;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--shu);
+  color: #fff;
+  box-shadow: 0 3px 6px rgba(200,92,60,0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #b04e30;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--washi-dark);
+  color: var(--text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #d8d0c0;
+}
+
+.btn-reset {
+  background: #e8e0d0;
+  color: var(--text-sub);
+}
+
+.btn-reset:hover:not(:disabled) {
+  background: #d8d0c0;
+}
+
+.btn-ai {
+  background: var(--kin);
+  color: #fff;
+}
+
+.btn-ai:hover:not(:disabled) {
+  background: #a0822e;
+}
+
+/* ---------- 進捗表示 ---------- */
+.progress {
+  margin-top: 24px;
+}
+
+.progress-label {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+  letter-spacing: 0.2em;
+}
+
+.yao-slots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.yao-slot {
+  width: 56px;
+  height: 40px;
+  border: 1px solid var(--washi-dark);
+  background: #fffef9;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text-sub);
+  transition: all 0.3s;
+}
+
+.yao-slot .bar {
+  width: 28px;
+  height: 8px;
+  border-radius: 2px;
+  margin: 3px 0;
+}
+
+.yao-slot .bar.old {
+  background: var(--hen);
+  position: relative;
+}
+
+.yao-slot .bar.old::after {
+  content: "●";
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 8px;
+  color: var(--hen);
+}
+
+.yao-slot.filled {
+  border-color: var(--sumi);
+  background: var(--washi);
+}
+
+/* ---------- 結果表示 ---------- */
+.result-card {
+  border: 1px solid var(--washi-dark);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  background: #fffef9;
+}
+
+.result-card h3 {
+  color: var(--shu);
+  border-bottom: 1px solid var(--washi-dark);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.kua-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.kua-symbol {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.kua-name {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: var(--sumi);
+}
+
+.kua-number {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  background: var(--washi);
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.kua-line {
+  font-family: monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.3em;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+
+.yin-yang-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.henyo-row {
+  background: #faf6ee;
+  border-left: 3px solid var(--hen);
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+  margin: 8px 0;
+  font-size: 0.95rem;
+  color: var(--hen);
+}
+
+/* ---------- 変卦グリッド ---------- */
+.kua-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+@media (min-width: 640px) {
+  .kua-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------- 本卦 一言お告げ ---------- */
+.kua-catch {
+  background: linear-gradient(135deg, #faf3e3, #f5e8c8);
+  border: 1px solid var(--kin);
+  border-left: 4px solid var(--shu);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--sumi);
+}
+
+/* ---------- AIモック解釈 ---------- */
+.ai-mock {
+  line-height: 1.9;
+}
+
+.ai-mock p {
+  margin-bottom: 10px;
+}
+
+.ai-kami {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--shu);
+  border-bottom: 2px solid var(--kin);
+  padding-bottom: 8px;
+  margin-bottom: 14px !important;
+  letter-spacing: 0.15em;
+}
+
+.ai-lead {
+  font-size: 1.05rem;
+  font-weight: bold;
+  color: var(--sumi);
+}
+
+.ai-catch {
+  background: #faf3e3;
+  border-left: 3px solid var(--kin);
+  padding: 8px 12px;
+  border-radius: 0 6px 6px 0;
+  font-weight: bold;
+  color: var(--sumi);
+}
+
+.ai-kambun {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--sumi);
+  font-style: italic;
+}
+
+.ai-gendai {
+  color: var(--text-sub);
+}
+
+.ai-yao {
+  background: var(--washi);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 10px 0;
+}
+
+.ai-yao-label {
+  font-size: 0.85rem;
+  color: var(--shu);
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.ai-future {
+  background: #f0f7f0;
+  border-left: 3px solid var(--good);
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+  font-weight: bold;
+  color: var(--good);
+  margin-top: 14px;
+}
+
+.ai-disclaimer {
+  background: #faf6ee;
+  border: 1px dashed var(--kin);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-top: 16px;
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  text-align: center;
+}
+
+.ai-disclaimer p {
+  margin-bottom: 4px !important;
+}
+
+/* ---------- 変卦折りたたみ ---------- */
+.henkaku-fold {
+  margin-top: 8px;
+}
+
+.fold-toggle {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 12px 16px;
+  background: var(--washi);
+  border: 1px solid var(--washi-dark);
+  border-left: 4px solid var(--kin);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+  letter-spacing: 0.08em;
+  transition: background 0.2s;
+}
+
+.fold-toggle:hover {
+  background: #f0ead9;
+}
+
+.fold-icon {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--kin);
+  transition: transform 0.2s;
+}
+
+.fold-body {
+  margin-top: 4px;
+  display: none; /* 初期状態では折りたたむ */
+}
+
+/* ---------- 神託見出し ---------- */
+.yaoji-oracle {
+  background: linear-gradient(135deg, #faf3e3, #f5e8c8);
+  border: 1px solid var(--kin);
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin: 12px 0;
+  font-size: 1.05rem;
+  font-weight: bold;
+  color: var(--sumi);
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+/* ---------- 爻辞 ---------- */
+.yaoji-card {
+  border: 1px solid var(--washi-dark);
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 12px;
+  background: #fffef9;
+}
+
+.yaoji-card.main {
+  border-left: 4px solid var(--shu);
+}
+
+.yaoji-card.jun {
+  border-left: 4px solid var(--kin);
+  opacity: 0.9;
+}
+
+.yaoji-label {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-bottom: 6px;
+}
+
+.yaoji-kambun {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--sumi);
+  margin-bottom: 6px;
+  line-height: 1.8;
+}
+
+.yaoji-yakubun {
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.yaoji-gendai {
+  font-size: 0.9rem;
+  color: var(--text-sub);
+}
+
+.yaoji-rule {
+  background: #faf6ee;
+  border: 1px dashed var(--kin);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+/* ---------- AIエリア ---------- */
+.ai-setting {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.ai-setting label {
+  font-size: 0.9rem;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.ai-setting input {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 12px;
+  border: 1px solid var(--washi-dark);
+  border-radius: 6px;
+  font-family: inherit;
+  background: #fffef9;
+}
+
+.ai-output {
+  background: var(--washi);
+  border-radius: 8px;
+  padding: 20px;
+  font-size: 0.95rem;
+  min-height: 120px;
+}
+
+.ai-output .hint {
+  color: var(--text-sub);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ---------- バッジ ---------- */
+.badge {
+  display: inline-block;
+  background: var(--kin);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 1px 8px;
+  border-radius: 8px;
+  vertical-align: middle;
+  margin-left: 6px;
+  letter-spacing: 0.1em;
+}
+
+/* ---------- フッター ---------- */
+.footer {
+  text-align: center;
+  color: var(--text-sub);
+  font-size: 0.8rem;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--washi-dark);
+}
+
+/* ---------- レスポンシブ ---------- */
+@media (max-width: 480px) {
+  .container {
+    padding: 12px 10px 40px;
+  }
+  .section {
+    padding: 16px 16px;
+  }
+  .title {
+    font-size: 1.8rem;
+  }
+  .coin {
+    width: 50px;
+    height: 50px;
+    font-size: 1rem;
+  }
+  .yao-result {
+    font-size: 1.6rem;
+  }
+}
+
+/* ---------- テスト表示エリア ---------- */
+.test-note {
+  color: var(--text-sub);
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.test-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.test-controls select {
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  border: 1px solid var(--washi-dark);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  max-width: 280px;
+}
+
+.test-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.test-result .kua-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* ---------- 履歴エリア ---------- */
+.history-note {
+  color: var(--text-sub);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+.history-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.history-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--washi-dark);
+  border-radius: 8px;
+  background: var(--washi);
+  padding: 8px;
+}
+
+.history-empty {
+  color: var(--text-sub);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 20px !important;
+}
+
+.history-item {
+  background: #fffef9;
+  border: 1px solid var(--washi-dark);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.history-item:last-child {
+  margin-bottom: 0;
+}
+
+.history-date {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-bottom: 4px;
+}
+
+.history-body {
+  font-size: 0.95rem;
+}
+
+.history-kua {
+  color: var(--sumi);
+  margin-bottom: 4px;
+  font-weight: bold;
+}
+
+.history-fortune {
+  font-size: 0.85rem;
+  color: var(--text);
+  border-left: 3px solid var(--kin);
+  padding: 4px 10px;
+  margin-top: 4px;
+  background: #faf6ee;
+  border-radius: 0 4px 4px 0;
+}

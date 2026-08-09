@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中筮法 - 易占</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#2c2a26">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="中筮法">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <header class="header">
+    <h1 class="title">中筮法</h1>
+    <p class="subtitle">周易六十四卦 ブラウザ占筮</p>
+  </header>
+
+  <!-- 卦辞・爻辞データ読み込み表示 -->
+  <div id="data-status" class="data-status"></div>
+
+  <!-- メインエリア -->
+  <main>
+
+    <!-- ① 説明 -->
+    <section class="section" id="intro">
+      <h2>占い方</h2>
+      <p>硬貨を3枚用意して、「投げる」ボタンを押してください。<br>
+      表（おもて）を<b>3</b>、裏（うら）を<b>2</b>として、合計値を求めます。<br>
+      これを6回繰り返し、下（初爻）から上（上爻）に向かって卦を組み立てます。</p>
+      <div class="rule-table">
+        <table>
+          <tr><th>合計</th><th>爻の種類</th><th>性質</th></tr>
+          <tr><td>6</td><td>老陰</td><td>陰 · <span class="hen">変爻</span></td></tr>
+          <tr><td>7</td><td>少陽</td><td>陽</td></tr>
+          <tr><td>8</td><td>少陰</td><td>陰</td></tr>
+          <tr><td>9</td><td>老陽</td><td>陽 · <span class="hen">変爻</span></td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ② 占筮エリア -->
+    <section class="section" id="fortune-area">
+      <h2>占筮</h2>
+
+      <!-- 占的入力 -->
+      <div class="fortune-input">
+        <label for="fortune-text">何について占いますか？<span class="input-note">（最大200文字）</span></label>
+        <textarea id="fortune-text" maxlength="200" rows="3"
+          placeholder="例：仕事の転機を迎えている。このまま転職すべきか迷っている…"></textarea>
+        <div class="input-counter"><span id="input-count">0</span> / 200</div>
+      </div>
+
+      <!-- コイン表示 -->
+      <div class="coin-area">
+        <div class="coins" id="coins">
+          <div class="coin" id="coin1">?</div>
+          <div class="coin" id="coin2">?</div>
+          <div class="coin" id="coin3">?</div>
+        </div>
+        <div class="yao-result" id="yao-result">—</div>
+      </div>
+
+      <!-- 操作ボタン -->
+      <div class="controls">
+        <button id="btn-toss" class="btn btn-primary">硬貨を投げる</button>
+        <button id="btn-skip" class="btn btn-secondary" style="display:none;">自動で占う（一括）</button>
+        <button id="btn-reset" class="btn btn-reset" style="display:none;">やり直す</button>
+      </div>
+
+      <!-- 進捗 -->
+      <div class="progress" id="progress">
+        <div class="progress-label">初爻 ‥ 上爻</div>
+        <div class="yao-slots" id="yao-slots">
+          <div class="yao-slot" id="slot0" data-idx="0">初爻</div>
+          <div class="yao-slot" id="slot1" data-idx="1">二爻</div>
+          <div class="yao-slot" id="slot2" data-idx="2">三爻</div>
+          <div class="yao-slot" id="slot3" data-idx="3">四爻</div>
+          <div class="yao-slot" id="slot4" data-idx="4">五爻</div>
+          <div class="yao-slot" id="slot5" data-idx="5">上爻</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 結果エリア -->
+    <section class="section" id="result-area" style="display:none;">
+      <h2>立卦結果</h2>
+      <div class="result" id="result"></div>
+    </section>
+
+    <!-- ③b テスト表示（任意の卦を確認） -->
+    <section class="section" id="test-area">
+      <h2>テスト表示 <span class="badge">確認用</span></h2>
+      <p class="test-note">硬貨を投げずに、任意の卦・爻の「天の声」を確認できます。</p>
+      <div class="test-controls">
+        <label for="test-kua-select">卦を選択：</label>
+        <select id="test-kua-select"></select>
+        <button id="btn-test-show" class="btn btn-secondary">表示する</button>
+        <button id="btn-test-clear" class="btn btn-reset">クリア</button>
+      </div>
+      <div id="test-result" class="test-result"></div>
+    </section>
+
+    <!-- ③c 占い履歴 -->
+    <section class="section" id="history-area">
+      <h2>占い履歴</h2>
+      <p class="history-note">占った内容は「この端末」に自動保存されます（最大50件）。CSVで書き出して自分の記録として保存できます。</p>
+      <div class="history-controls">
+        <button id="btn-history" class="btn btn-secondary">履歴を読み込む</button>
+        <button id="btn-export" class="btn btn-secondary">CSVで書き出す</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </section>
+
+    <!-- ④ 爻辞表示 -->
+    <section class="section" id="yaoji-area" style="display:none;">
+      <h2>読むべき爻辞</h2>
+      <div class="yaoji" id="yaoji"></div>
+    </section>
+
+    <!-- ⑤ AI解釈（プレースホルダー） -->
+    <section class="section" id="ai-area" style="display:none;">
+      <h2>AI 統合解釈 <span class="badge">β</span></h2>
+      <div class="ai-setting">
+        <label>API キー（任意）</label>
+        <input type="password" id="api-key" placeholder="OpenAI / Anthropic 等の API Key">
+        <button id="btn-ai" class="btn btn-ai">解釈する</button>
+      </div>
+      <div class="ai-output" id="ai-output">
+        <p class="hint">※ まだ未実装のプレースホルダーです。<br>将来、あなたの履歴を参照した統合解釈を生成します。</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>© 2026 易占 by 陰陽師の友</p>
+  </footer>
+</div>
+
+<!-- スクリプト読み込み -->
+<script src="data/rokujuyonka.js"></script>
+<script src="data/catch_messages.js"></script>
+<script src="data/yaoji_part1.js"></script>
+<script src="data/yaoji_part2.js"></script>
+<script src="data/yaoji_part3.js"></script>
+<script src="js/kakei.js"></script>
+<script src="js/chusekiho.js"></script>
+<script src="js/app.js"></script>
+<script>
+  // Service Worker 登録（PWA）
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
+</｜｜DSML｜｜tool>

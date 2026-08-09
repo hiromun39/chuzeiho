@@ -1,0 +1,18 @@
+{
+  "name": "中筮法 - 周易六十四卦 ブラウザ占筮",
+  "short_name": "中筮法",
+  "description": "硬貨3枚を6回投げて易を立てる、周易六十四卦の本格的なブラウザ占筮。卦辞・爻辞・天の声（voice）で導きを得られます。",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f0e6",
+  "theme_color": "#2c2a26",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
