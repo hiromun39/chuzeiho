@@ -110,10 +110,13 @@
     <!-- ③c 占い履歴 -->
     <section class="section" id="history-area">
       <h2>占い履歴</h2>
-      <p class="history-note">占った内容は「この端末」に自動保存されます（最大50件）。CSVで書き出して自分の記録として保存できます。</p>
+      <p class="history-note">占った内容は「この端末」に自動保存されます（最大50件）。占い結果とAI解釈を記録できます。</p>
+      <div id="history-count" class="history-count"></div>
       <div class="history-controls">
         <button id="btn-history" class="btn btn-secondary">履歴を読み込む</button>
         <button id="btn-export" class="btn btn-secondary">CSVで書き出す</button>
+        <button id="btn-export-json" class="btn btn-secondary">JSONでバックアップ</button>
+        <button id="btn-clear-all" class="btn btn-reset">全削除</button>
       </div>
       <div id="history-list" class="history-list"></div>
     </section>
@@ -124,16 +127,24 @@
       <div class="yaoji" id="yaoji"></div>
     </section>
 
-    <!-- ⑤ AI解釈（プレースホルダー） -->
+    <!-- ⑤ AI解釈（四雲先生の統合解釈） -->
     <section class="section" id="ai-area" style="display:none;">
       <h2>AI 統合解釈 <span class="badge">β</span></h2>
       <div class="ai-setting">
-        <label>API キー（任意）</label>
-        <input type="password" id="api-key" placeholder="OpenAI / Anthropic 等の API Key">
+        <label>AIプロバイダ</label>
+        <select id="ai-provider">
+          <option value="deepseek">DeepSeek（低コスト）</option>
+          <option value="openai">OpenAI</option>
+        </select>
+        <label>
+          API キー
+          <input type="password" id="api-key" placeholder="API Key を入力">
+        </label>
         <button id="btn-ai" class="btn btn-ai">解釈する</button>
       </div>
+      <div id="ai-credit" class="ai-credit"></div>
       <div class="ai-output" id="ai-output">
-        <p class="hint">※ まだ未実装のプレースホルダーです。<br>将来、あなたの履歴を参照した統合解釈を生成します。</p>
+        <p class="hint">🎴 占いが完了すると、ここに四雲先生の統合解釈が表示されます。</p>
       </div>
     </section>
 
@@ -151,7 +162,7 @@
 <script src="data/yaoji_part2.js"></script>
 <script src="data/yaoji_part3.js"></script>
 <script src="js/kakei.js"></script>
-<script src="js/chusekiho.js"></script>
+<script src="js/chuzeiho.js"></script>
 <script src="js/app.js"></script>
 <script>
   // Service Worker 登録（PWA）

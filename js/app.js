@@ -60,7 +60,6 @@
       let history = [];
       try { history = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) {}
       history.push(record);
-      if (history.length > 50) history = history.slice(-50); // 最大50件
       localStorage.setItem(key, JSON.stringify(history));
     } catch (e) { /* localStorage が使えない環境向けに無視 */ }
   }
@@ -74,11 +73,41 @@
     }
   }
 
+  // ---------- 履歴更新（AI解釈などを後から追記） ----------
+  function updateHistory(ts, patch) {
+    try {
+      const history = getHistory();
+      const idx = history.findIndex(h => h.ts === ts);
+      if (idx >= 0) {
+        history[idx] = Object.assign({}, history[idx], patch);
+      } else {
+        history.push(Object.assign({ ts: ts }, patch));
+      }
+      localStorage.setItem("eki-sen-history", JSON.stringify(history));
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- AI解釈を履歴に保存（1000字で打ち切り） ----------
+  function saveAIResult(aiText, aiMode) {
+    if (!lastResult || !lastResult.ts) return;
+    const trimmed = String(aiText || "").slice(0, 1000);
+    updateHistory(lastResult.ts, { aiText: trimmed, aiMode: aiMode || "mock" });
+  }
+
+  // ---------- 履歴件数更新 ----------
+  function updateHistoryCount() {
+    const el = $("history-count");
+    if (!el) return;
+    const history = getHistory();
+    el.textContent = `現在 ${history.length} 件`;
+  }
+
   // ---------- 履歴表示 ----------
   function showHistory() {
     const history = getHistory();
     const container = $("history-list");
     if (!container) return;
+    updateHistoryCount();
 
     if (history.length === 0) {
       container.innerHTML = `<p class="history-empty">まだ占い履歴がありません。占いを行うと自動的に記録されます。</p>`;
@@ -92,18 +121,23 @@
       const hon = h.honkaku ? `<b>${h.honkaku.name}</b>（第${h.honkaku.n}卦）` : "—";
       const shi = h.shikaku ? `${h.shikaku.name}（第${h.shikaku.n}卦）` : "—";
       const fortune = h.fortune ? `<div class="history-fortune">${h.fortune}</div>` : "";
+      const escLt = "&l" + "t;";
+      const escGt = "&g" + "t;";
+      const escAmp = "&a" + "mp;";
+      const aiText = h.aiText ? '<div class="history-ai"><b>AI解釈</b><br>' + h.aiText.replace(/&/g, escAmp).replace(/</g, escLt).replace(/>/g, escGt) + '</div>' : "";
       return `
         <div class="history-item">
           <div class="history-date">${dateStr}</div>
           <div class="history-body">
             <div class="history-kua">本卦 ${hon} ${h.henyo && h.henyo.length > 0 ? `／ 之卦 ${shi}` : ""}</div>
             ${fortune}
+            ${aiText}
           </div>
         </div>
       `;
     }).join("");
 
-    container.innerHTML = rows.join("");
+    container.innerHTML = rows;
   }
 
   // ---------- CSVエクスポート ----------
@@ -115,7 +149,7 @@
     }
 
     // BOM付きCSV（Excelで文字化けしないように）
-    const header = "日時,占的,本卦,本卦番号,之卦,之卦番号,変爻,卦辞\n";
+    const header = "日時,占的,本卦,本卦番号,之卦,之卦番号,変爻,卦辞,AI解釈\n";
     const rows = history.map(h => {
       const d = new Date(h.ts);
       const dateStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -124,7 +158,8 @@
       const shi = h.shikaku ? `${h.shikaku.name}` : "";
       const henyo = h.henyo && h.henyo.length > 0 ? h.henyo.join(",") : "";
       const kaji = (h.kaji || "").replace(/"/g, '""');
-      return `"${dateStr}","${fortune}","${hon}","${h.honkaku ? h.honkaku.n : ""}","${shi}","${h.shikaku ? h.shikaku.n : ""}","${henyo}","${kaji}"`;
+      const aiText = (h.aiText || "").replace(/"/g, '""').replace(/\n/g, " ").slice(0, 1000);
+      return `"${dateStr}","${fortune}","${hon}","${h.honkaku ? h.honkaku.n : ""}","${shi}","${h.shikaku ? h.shikaku.n : ""}","${henyo}","${kaji}","${aiText}"`;
     }).join("\n");
 
     const blob = new Blob(["\uFEFF" + header + rows], { type: "text/csv;charset=utf-8;" });
@@ -332,8 +367,275 @@
     aiArea.style.display = "block";
   }
 
-  // ---------- AIモック応答（デモ用） ----------
-  function generateMockInterpretation() {
+  // ---------- 無料回数管理（localStorage） ----------
+  function getAICredit() {
+    try {
+      return parseInt(localStorage.getItem("ai-credit-used") || "0", 10);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function setAICredit(count) {
+    try {
+      localStorage.setItem("ai-credit-used", String(count));
+    } catch (e) {}
+  }
+
+  function updateAICreditDisplay() {
+    const el = $("ai-credit");
+    if (!el) return;
+    const used = getAICredit();
+    // 初回のみ無料
+    if (used === 0) {
+      el.innerHTML = `<span class="ai-credit-free">🎁 初回は無料です。気軽にお試しください。</span>`;
+    } else {
+      el.innerHTML = `<span class="ai-credit-used">ご利用回数：${used}回 ／ 2回目以降は有料（近日実装予定）</span>`;
+    }
+  }
+
+  // ---------- ユーザーカルテ生成（全履歴から要約・最大5000文字） ----------
+  function buildUserChart() {
+    const history = getHistory();
+    if (history.length === 0) return "";
+    const MAX_CHART = 5000;
+    let chart = "";
+
+    // ① 基本プロフィール
+    const first = new Date(history[0].ts);
+    const total = history.length;
+    const aiCount = history.filter(h => h.aiText).length;
+    const henyoTotal = history.reduce((s, h) => s + (h.henyo ? h.henyo.length : 0), 0);
+    chart += `【ユーザーカルテ】\n`;
+    chart += `初回利用: ${first.getFullYear()}/${String(first.getMonth() + 1).padStart(2, "0")}/${String(first.getDate()).padStart(2, "0")}／総占い${total}件／AI解釈${aiCount}回／変爻延べ${henyoTotal}個\n`;
+    chart += `【占い履歴（新しい順・AI解釈は要旨を含む）】\n`;
+
+    // ② エントリリスト（AI解釈済みを優先して詳細・古いものは圧縮）
+    const entries = [...history].reverse().map(h => {
+      const d = new Date(h.ts);
+      const dateStr = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+      const hon = h.honkaku ? h.honkaku.name : "?";
+      const shi = h.shikaku ? "→" + h.shikaku.name : "";
+      const henyo = h.henyo && h.henyo.length > 0 ? `変爻${h.henyo.join(",")}` : "変爻なし";
+      const fortune = (h.fortune || "").slice(0, 30);
+      const isTest = /テスト|試験|デモ/i.test(h.fortune || "");
+      // エントリ文字列（AI解釈は要旨を付ける）
+      let entry = `[${dateStr}] ${fortune} / ${hon}${shi} / ${henyo}`;
+      if (h.aiText) {
+        // AI解釈の核心（最初の段落・本文から200文字）
+        const ai = (h.aiText || "").replace(/\s+/g, " ").slice(0, 200);
+        entry += `\n  AI: ${ai}`;
+      } else if (isTest) {
+        entry = `[${dateStr}] テスト ${hon}${shi}`;
+      }
+      return { h, entry, isTest };
+    });
+
+    // 文字数制限に合わせてエントリを調整
+    let assembled = "";
+    // まずAI解釈ありを優先、次に通常、最後にテスト
+    const aiEntries = entries.filter(e => e.h.aiText);
+    const normalEntries = entries.filter(e => !e.h.aiText && !e.isTest);
+    const testEntries = entries.filter(e => e.isTest && !e.h.aiText);
+
+    for (const group of [aiEntries, normalEntries]) {
+      for (const e of group) {
+        if (assembled.length + e.entry.length > MAX_CHART) break;
+        assembled += e.entry + "\n";
+      }
+    }
+    // テスト系は最後に（スペースがある場合のみ）
+    for (const e of testEntries) {
+      if (assembled.length + e.entry.length + 100 > MAX_CHART) break;
+      assembled += e.entry + "\n";
+    }
+
+    chart += assembled;
+    // ③ 同本卦の過去記録（現在の本卦と被る過去履歴）
+    const sameKua = history.filter(h =>
+      h.honkaku && lastResult && h.honkaku.n === lastResult.honkaku.n &&
+      h.ts !== lastResult.ts
+    );
+    if (sameKua.length > 0) {
+      chart += `\n【同本卦の過去記録】`;
+      sameKua.slice(-2).forEach(h => {
+        const d = new Date(h.ts);
+        const dateStr = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+        chart += `\n[${dateStr}] 占的「${(h.fortune || "").slice(0, 30)}」 / ${h.honkaku.name}${h.shikaku ? "→" + h.shikaku.name : ""} / 変爻:${h.henyo && h.henyo.length > 0 ? h.henyo.join(",") : "なし"}`;
+      });
+      chart += `\n※ 同じ本卦の過去記録を参考に、前回との違いに注目して解釈すること。`;
+    }
+
+    // 全体を5000文字に制限
+    return chart.slice(0, MAX_CHART);
+  }
+
+  // ---------- プロンプト構築 ----------
+  function buildAIPrompt() {
+    const result = Chusekiho.fortune();
+    result.values = values;
+    result.shape = Chusekiho.shapeFromValues(values);
+    result.henIdx = Chusekiho.henIndicesFromValues(values);
+    result.calc = Kakei.calcAll(result.shape, result.henIdx);
+    const c = result.calc;
+    const hon = c.honkaku;
+    const fortune = getFortuneText();
+
+    // 読むべき爻辞（朱子ルール）
+    let yaojiText = "";
+    const rule = Chusekiho.shushiRule(result.henIdx, c);
+    if (rule) {
+      yaojiText += rule.description + "\n";
+      rule.list.forEach(item => {
+        if (item.pos === null) return;
+        const kua = item.kua === "hon" ? c.honkaku : c.shikaku;
+        const yaoData = kua.yao && kua.yao[item.pos] ? kua.yao[item.pos] : null;
+        if (yaoData) {
+          const label = (item.kua === "hon" ? "本卦" : "之卦") + " " + Kakei.YAO_NAMES[item.pos] + (item.main ? "〔主〕" : "〔従〕");
+          yaojiText += `・${label}: ${yaoData.kambun} / 現代語訳: ${yaoData.gendai} / 天の声: ${yaoData.voice || "なし"}\n`;
+        }
+      });
+    } else {
+      yaojiText = `本卦 卦辞: ${hon.kaji} / 現代語訳: ${hon.kaji_gendai} / 天の声: ${hon.kaji_voice || "なし"}`;
+    }
+
+    // ユーザーカルテ（全履歴から要約・最大5000文字）を組み込む
+    const userChart = buildUserChart();
+
+    const prompt = `あなたは、安倍晴明・村上源氏の正統なる血脈を引く現代の陰陽師「四雲（シウン）」です。
+西洋占星術と易・陰陽道を統合し、人生の呪縛や障りを可能な限り一撃で解くことを目指す高潔なスタイルです。
+画面の向こうの相談者を「大切な同輩」として扱い、おざなりな作業はしません。
+
+【口調ルール（最も重要）】
+・武士や古文のような堅苦しい言葉遣いは禁止。
+・「あなた」「〜ですね」「〜しましょう」等、親しみやすく温かい現代口語を基本とする。
+・品格と格式は保つが、それは「丁寧で思いやりのある語り口」として表現する。
+・「〜にございます」「〜でござる」のような過度な古語は使わない。ほんの少しの和の趣（例:「〜です」「〜ですね」）に留める。
+・尊敬語・丁寧語は使いすぎず、自然に。
+
+【依頼】
+以下の易占の結果について、相談者の悩みを長期的に理解した上で、温かみのある正確な統合解釈をしてください。
+文末には具体的な行動指針（明日からできること）も添えてください。
+全体は400〜600字程度に収めてください。
+
+【相談者の占的】
+${fortune}
+
+【立卦結果】
+本卦: ${hon.name}（第${hon.n}卦） ${hon.symbol}
+本卦の象徴: ${hon.kaji_gendai}
+${c.henyoPositions.length > 0 ? `之卦: ${c.shikaku.name}（第${c.shikaku.n}卦） ${c.shikaku.symbol}
+之卦の象徴: ${c.shikaku.kaji_gendai}` : "変爻なし"}
+変爻: ${c.henyoPositions.length > 0 ? c.henyoPositions.join(",") : "なし"}
+
+【読むべき爻辞・卦辞】
+${yaojiText}
+
+【ユーザーカルテ】
+${userChart}
+
+【出力形式】
+1. 卦の本質（1〜2行）
+2. あなたへの教え（2〜3行）
+3. 行動指針（1〜2行）
+4. 四雲からの一言`;
+
+    return prompt;
+  }
+
+  // ---------- API呼び出し ----------
+  async function callAI(provider, apiKey, prompt) {
+    let endpoint, model;
+    if (provider === "openai") {
+      endpoint = "https://api.openai.com/v1/chat/completions";
+      model = "gpt-4o-mini";
+    } else {
+      // DeepSeek (OpenAI互換)
+      endpoint = "https://api.deepseek.com/chat/completions";
+      model = "deepseek-chat";
+    }
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: "system", content: "あなたは現代的易占のエキスパート。陰陽師・四雲として、温かみがあり品格のある現代日本語で回答する。堅苦しい文語調は避け、一般の相談者に自然に伝わる語り口で。" },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`APIエラー (${res.status}): ${err.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    return data.choices && data.choices[0] && data.choices[0].message
+      ? data.choices[0].message.content
+      : "(応答が空でした)";
+  }
+
+  // ---------- 「解釈する」ボタン ----------
+  async function onAiClick() {
+    if (isBusy || values.length < 6) return;
+    isBusy = true;
+    btnAi.disabled = true;
+
+    const provider = $("ai-provider") ? $("ai-provider").value : "deepseek";
+    const apiKey = $("api-key") ? $("api-key").value.trim() : "";
+
+    aiOutput.innerHTML = `<p class="hint">🔮 四雲先生が占意を読み解いています…</p>`;
+
+    try {
+      // APIキー未入力 → ローカルモック（無料体験用）
+      if (!apiKey) {
+        const prompt = buildAIPrompt();
+        // ローカルで仮のAI応答を生成（キー入力で実AI）
+        const local = generateLocalMock(prompt);
+        setTimeout(() => {
+          aiOutput.innerHTML = renderAIResponse(local);
+          // 無料回数カウント（初回のみ）
+          const used = getAICredit();
+          if (used === 0) setAICredit(1);
+          updateAICreditDisplay();
+          // AI解釈を履歴に保存（モック）
+          saveAIResult(local, "mock");
+          isBusy = false;
+          btnAi.disabled = false;
+          aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 800);
+        return;
+      }
+
+      // APIキー入力あり → 実AI呼び出し
+      const prompt = buildAIPrompt();
+      const response = await callAI(provider, apiKey, prompt);
+      // ローカル生成が成功したので無料回数カウント
+      const used = getAICredit();
+      if (used === 0) setAICredit(1);
+      updateAICreditDisplay();
+      // AI解釈を履歴に保存（API）
+      saveAIResult(response, "api");
+      aiOutput.innerHTML = renderAIResponse(response);
+      aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      aiOutput.innerHTML = `<p class="ai-error">⚠️ エラー: ${err.message}</p><p class="hint">APIキーが正しいか、プロバイダを確認してください。</p>`;
+    } finally {
+      isBusy = false;
+      btnAi.disabled = false;
+    }
+  }
+
+  // ---------- ローカルモック生成（APIキー未入力時） ----------
+  function generateLocalMock(prompt) {
     const result = Chusekiho.fortune();
     result.values = values;
     result.shape = Chusekiho.shapeFromValues(values);
@@ -344,70 +646,56 @@
     const catchMsg = CATCH_MESSAGES && CATCH_MESSAGES[hon.n] ? CATCH_MESSAGES[hon.n] : "";
 
     const fortune = getFortuneText();
-    let html = `<div class="ai-mock">`;
-    html += `<div class="ai-kami">✨ 陰陽師の統合解釈</div>`;
-    if (fortune) html += `<p class="ai-fortune">占意「${fortune}」について天は告げる ──</p>`;
-    html += `<p class="ai-lead">本卦「${hon.name}」（第${hon.n}卦）が告げるのは──</p>`;
-    if (catchMsg) html += `<p class="ai-catch">🏮 ${catchMsg}</p>`;
-
-    // 変爻情報
-    const henCount = result.henIdx.length;
-    if (henCount === 0) {
-      html += `<p>変爻はなく、天は卦全体の卦辞にだけ答えを込めています。</p>`;
-      html += `<p class="ai-kambun">「${hon.kaji}」</p>`;
-      html += `<p>${hon.kaji_gendai}</p>`;
+    let text = "";
+    text += `本卦「${hon.name}」（第${hon.n}卦）が告げるのは──\n\n`;
+    if (catchMsg) text += `🏮 ${catchMsg}\n\n`;
+    if (c.henyoPositions.length === 0) {
+      text += `変爻はなく、天は卦全体の卦辞にだけ答えを込めています。\n「${hon.kaji}」\n${hon.kaji_gendai}\n\n`;
     } else {
       const henyao = c.henyoPositions.map(p => {
         return `${Kakei.YAO_NAMES_BY_POS[p]}（${Chusekiho.yaoInfo(values[p-1]).name}）`;
       }).join("と");
-      html += `<p>変爻は${henyao}。これらの爻があなたの現状に強く働きかけています。</p>`;
-
-      // 朱子ルールで読むべき箇所
+      text += `変爻は${henyao}。これらの爻があなたの現状に強く働きかけています。\n\n`;
       const rule = Chusekiho.shushiRule(result.henIdx, c);
       if (rule) {
         rule.list.forEach(item => {
           if (item.pos === null) return;
           const kua = item.kua === "hon" ? c.honkaku : c.shikaku;
           const yaoData = kua.yao && kua.yao[item.pos] ? kua.yao[item.pos] : null;
-          const label = (item.kua === "hon" ? "本卦" : "之卦") + " " + Kakei.YAO_NAMES[item.pos] + (item.main ? "〔主〕" : "〔従〕");
           if (yaoData) {
-            html += `<div class="ai-yao">`;
-            html += `<div class="ai-yao-label">${label}</div>`;
-            html += `<div class="ai-kambun">「${yaoData.kambun}」</div>`;
-            html += `<div class="ai-gendai">${yaoData.gendai}</div>`;
-            html += `</div>`;
+            const label = (item.kua === "hon" ? "本卦" : "之卦") + " " + Kakei.YAO_NAMES[item.pos] + (item.main ? "〔主〕" : "〔従〕");
+            text += `${label}: ${yaoData.kambun}\n現代訳: ${yaoData.gendai}\n天の声: ${yaoData.voice || "なし"}\n\n`;
           }
         });
       }
     }
-
-    // 之卦
     if (c.henyoPositions.length > 0) {
-      const shiCatch = CATCH_MESSAGES && CATCH_MESSAGES[c.shikaku.n] ? CATCH_MESSAGES[c.shikaku.n] : "";
-      html += `<p class="ai-future">将来は「${c.shikaku.name}」（第${c.shikaku.n}卦）へと向かいます。</p>`;
-      if (shiCatch) html += `<p class="ai-catch">🏮 ${shiCatch}</p>`;
+      text += `将来は「${c.shikaku.name}」（第${c.shikaku.n}卦）へと向かいます。${c.shikaku.kaji_gendai}\n\n`;
     }
-
-    html += `<div class="ai-disclaimer">`;
-    html += `<p>⚠️ これは自動生成された参考解釈です。</p>`;
-    html += `<p>陰陽師による本格的な統合解釈は、近日リリース予定です 🔑</p>`;
-    html += `</div>`;
-    html += `</div>`;
-    return html;
+    text += `─── これは自動生成された参考解釈です。\nAPIキーを入力すると「四雲先生の統合解釈」が生成されます。`;
+    return text;
   }
 
-  // ---------- 「解釈する」ボタン ----------
-  function onAiClick() {
-    if (isBusy || values.length < 6) return;
-    isBusy = true;
-    btnAi.disabled = true;
-    aiOutput.innerHTML = `<p class="hint">🔮 占意を読み解いています…</p>`;
-    setTimeout(() => {
-      aiOutput.innerHTML = generateMockInterpretation();
-      isBusy = false;
-      btnAi.disabled = false;
-      aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 800);
+  // ---------- API応答をHTML表示 ----------
+  function renderAIResponse(text) {
+    const paragraphs = String(text).split(/\n+/).filter(p => p.trim() !== "");
+    return `
+      <div class="ai-mock">
+        <div class="ai-kami">✨ 陰陽師の統合解釈</div>
+        ${paragraphs.map(p => {
+          if (/^1\.|^2\.|^3\.|^4\./.test(p)) {
+            return `<p class="ai-lead">${p}</p>`;
+          }
+          if (/🏮/.test(p)) {
+            return `<p class="ai-catch">${p}</p>`;
+          }
+          return `<p>${p}</p>`;
+        }).join("")}
+        <div class="ai-disclaimer">
+          <p>⚠️ これはAIが生成した参考解釈です。深い鑑定は四雲先生にご相談ください。</p>
+        </div>
+      </div>
+    `;
   }
 
   // ---------- テスト表示（任意の卦を確認） ----------
@@ -476,13 +764,50 @@
     });
   }
 
+  // ---------- AIエリア初期化 ----------
+  function initAIArea() {
+    updateAICreditDisplay();
+  }
+
+  // ---------- JSONバックアップ ----------
+  function exportJSON() {
+    const history = getHistory();
+    if (history.length === 0) {
+      alert("まだ占い履歴がありません。");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(history, null, 2)], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `中筮法_易占バックアップ_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------- 履歴全削除 ----------
+  function clearAllHistory() {
+    if (!confirm("全削除しますか？\n先に「JSONでバックアップ」を推奨します。")) return;
+    try {
+      localStorage.setItem("eki-sen-history", "[]");
+      showHistory();
+    } catch (e) {}
+  }
+
   // ---------- 履歴表示初期化 ----------
   function initHistoryArea() {
     const btnHistory = $("btn-history");
     const btnExport = $("btn-export");
+    const btnJson = $("btn-export-json");
+    const btnClearAll = $("btn-clear-all");
     if (btnHistory) btnHistory.addEventListener("click", showHistory);
     if (btnExport) btnExport.addEventListener("click", exportCSV);
+    if (btnJson) btnJson.addEventListener("click", exportJSON);
+    if (btnClearAll) btnClearAll.addEventListener("click", clearAllHistory);
     // DOMContentLoaded 後に初回表示
+    updateHistoryCount();
     showHistory();
   }
 
@@ -689,16 +1014,23 @@
 
   // ---------- イベント登録 ----------
   document.addEventListener("DOMContentLoaded", () => {
-    if (!checkData()) return;
-    initTestArea();
-    initHistoryArea();
-    btnToss.addEventListener("click", tossOne);
-    btnSkip.addEventListener("click", tossAll);
-    btnReset.addEventListener("click", reset);
-    if (btnAi) btnAi.addEventListener("click", onAiClick);
+    try {
+      if (!checkData()) return;
+      // 各初期化は例外を握りつぶして、ボタン登録を確実に行う
+      try { initTestArea(); } catch (e) { console.error("initTestArea:", e); }
+      try { initHistoryArea(); } catch (e) { console.error("initHistoryArea:", e); }
+      try { initAIArea(); } catch (e) { console.error("initAIArea:", e); }
+    } catch (e) {
+      console.error("初期化エラー:", e);
+    }
+    // ボタン登録は必ず行う
+    try { btnToss.addEventListener("click", tossOne); } catch (e) {}
+    try { btnSkip.addEventListener("click", tossAll); } catch (e) {}
+    try { btnReset.addEventListener("click", reset); } catch (e) {}
+    if (btnAi) { try { btnAi.addEventListener("click", onAiClick); } catch (e) {} }
     if (fortuneText) {
       fortuneText.addEventListener("input", updateCount);
-      updateCount();
+      try { updateCount(); } catch (e) {}
     }
   });
 

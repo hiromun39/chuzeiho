@@ -697,7 +697,8 @@ body {
   white-space: nowrap;
 }
 
-.ai-setting input {
+.ai-setting input,
+.ai-setting select {
   flex: 1;
   min-width: 200px;
   padding: 10px 12px;
@@ -705,6 +706,37 @@ body {
   border-radius: 6px;
   font-family: inherit;
   background: #fffef9;
+}
+
+.ai-credit {
+  margin: 10px 0;
+}
+
+.ai-credit-free {
+  display: block;
+  background: #f0f7f0;
+  border-left: 3px solid var(--good);
+  padding: 8px 12px;
+  border-radius: 0 6px 6px 0;
+  color: var(--good);
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.ai-credit-used {
+  display: block;
+  background: #faf6ee;
+  border-left: 3px solid var(--kin);
+  padding: 8px 12px;
+  border-radius: 0 6px 6px 0;
+  color: var(--text-sub);
+  font-size: 0.9rem;
+}
+
+.ai-error {
+  color: var(--bad);
+  font-weight: bold;
+  margin-bottom: 8px;
 }
 
 .ai-output {
@@ -870,4 +902,22 @@ body {
   margin-top: 4px;
   background: #faf6ee;
   border-radius: 0 4px 4px 0;
+}
+
+.history-count {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-bottom: 10px;
+}
+
+.history-ai {
+  font-size: 0.85rem;
+  color: var(--text);
+  border-left: 3px solid var(--shu);
+  padding: 6px 10px;
+  margin-top: 6px;
+  background: #fdf6f2;
+  border-radius: 0 4px 4px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

@@ -4,7 +4,7 @@
    - アプリ更新時のキャッシュ更新
    ========================================= */
 
-const CACHE_NAME = "chusekiho-v1";
+const CACHE_NAME = "chuzeiho-v1";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -17,7 +17,7 @@ const CORE_ASSETS = [
   "./data/yaoji_part2.js",
   "./data/yaoji_part3.js",
   "./js/kakei.js",
-  "./js/chusekiho.js",
+  "./js/chuzeiho.js",
   "./js/app.js"
 ];
 
