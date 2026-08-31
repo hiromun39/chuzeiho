@@ -18,6 +18,7 @@ const CORE_ASSETS = [
   "./data/yaoji_part3.js",
   "./js/kakei.js",
   "./js/chuzeiho.js",
+  "./js/supabase.js",
   "./js/app.js"
 ];
 

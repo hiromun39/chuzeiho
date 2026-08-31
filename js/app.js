@@ -53,8 +53,9 @@
     if (counterParent) counterParent.classList.toggle("near-limit", len >= 180);
   }
 
-  // ---------- 履歴保存（localStorage・将来のサーバー連携用） ----------
+  // ---------- 履歴保存（Supabase + localStorage 併用） ----------
   function saveHistory(record) {
+    // 常に localStorage に保存（バックアップ）
     try {
       const key = "eki-sen-history";
       let history = [];
@@ -62,9 +63,14 @@
       history.push(record);
       localStorage.setItem(key, JSON.stringify(history));
     } catch (e) { /* localStorage が使えない環境向けに無視 */ }
+
+    // ログイン中は Supabase にも保存
+    if (window.AppSupabase && window.AppSupabase.user) {
+      window.AppSupabase.saveHistory(record);
+    }
   }
 
-  // ---------- 履歴を取得 ----------
+  // ---------- 履歴を取得（常にlocalStorage：ログイン時はDBから同期済み） ----------
   function getHistory() {
     try {
       return JSON.parse(localStorage.getItem("eki-sen-history") || "[]");
@@ -85,6 +91,11 @@
       }
       localStorage.setItem("eki-sen-history", JSON.stringify(history));
     } catch (e) { /* ignore */ }
+
+    // ログイン中は Supabase にも反映
+    if (window.AppSupabase && window.AppSupabase.user) {
+      window.AppSupabase.updateHistory(ts, patch);
+    }
   }
 
   // ---------- AI解釈を履歴に保存（1000字で打ち切り） ----------
@@ -950,6 +961,54 @@ ${userChart}
     btnSkip.disabled = false;
   }
 
+  // ---------- 認証UI初期化 ----------
+  function initAuthArea() {
+    const btnLogin = $("btn-login");
+    const btnLogout = $("btn-logout");
+    const authUser = $("auth-user");
+    if (!btnLogin || !btnLogout || !authUser) return;
+
+    // ログインボタン
+    btnLogin.addEventListener("click", async () => {
+      if (window.AppSupabase) {
+        await window.AppSupabase.signInWithGoogle();
+      }
+    });
+
+    // ログアウトボタン
+    btnLogout.addEventListener("click", async () => {
+      if (window.AppSupabase) {
+        await window.AppSupabase.signOut();
+        showHistory();
+      }
+    });
+
+    // 認証状態監視
+    if (window.AppSupabase) {
+      window.AppSupabase.init(async (user) => {
+        if (user) {
+          // ログイン済み
+          btnLogin.style.display = "none";
+          btnLogout.style.display = "inline-block";
+          const name = user.user_metadata?.full_name || user.email || "ユーザー";
+          authUser.textContent = `👤 ${name}`;
+          authUser.style.display = "inline-block";
+
+          // DBから履歴を取得 → localStorage に反映して画面更新
+          await window.AppSupabase.fetchHistoryFromDB();
+          // localStorage の履歴（未同期分）をDBへアップロード
+          await window.AppSupabase.syncLocalToDB();
+          showHistory();
+        } else {
+          // 未ログイン
+          btnLogin.style.display = "inline-block";
+          btnLogout.style.display = "none";
+          authUser.style.display = "none";
+        }
+      });
+    }
+  }
+
   // ---------- コイン投げ1回 ----------
   function tossOne() {
     // 合計で6回まで
@@ -1017,6 +1076,7 @@ ${userChart}
     try {
       if (!checkData()) return;
       // 各初期化は例外を握りつぶして、ボタン登録を確実に行う
+      try { initAuthArea(); } catch (e) { console.error("initAuthArea:", e); }
       try { initTestArea(); } catch (e) { console.error("initTestArea:", e); }
       try { initHistoryArea(); } catch (e) { console.error("initHistoryArea:", e); }
       try { initAIArea(); } catch (e) { console.error("initAIArea:", e); }
