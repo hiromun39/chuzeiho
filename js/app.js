@@ -98,10 +98,10 @@
     }
   }
 
-  // ---------- AI解釈を履歴に保存（1000字で打ち切り） ----------
+  // ---------- AI解釈を履歴に保存（2000字で打ち切り） ----------
   function saveAIResult(aiText, aiMode) {
     if (!lastResult || !lastResult.ts) return;
-    const trimmed = String(aiText || "").slice(0, 1000);
+    const trimmed = String(aiText || "").slice(0, 2000);
     updateHistory(lastResult.ts, { aiText: trimmed, aiMode: aiMode || "mock" });
   }
 
@@ -169,7 +169,7 @@
       const shi = h.shikaku ? `${h.shikaku.name}` : "";
       const henyo = h.henyo && h.henyo.length > 0 ? h.henyo.join(",") : "";
       const kaji = (h.kaji || "").replace(/"/g, '""');
-      const aiText = (h.aiText || "").replace(/"/g, '""').replace(/\n/g, " ").slice(0, 1000);
+      const aiText = (h.aiText || "").replace(/"/g, '""').replace(/\n/g, " ").slice(0, 2000);
       return `"${dateStr}","${fortune}","${hon}","${h.honkaku ? h.honkaku.n : ""}","${shi}","${h.shikaku ? h.shikaku.n : ""}","${henyo}","${kaji}","${aiText}"`;
     }).join("\n");
 
@@ -527,7 +527,7 @@
 【依頼】
 以下の易占の結果について、相談者の悩みを長期的に理解した上で、温かみのある正確な統合解釈をしてください。
 文末には具体的な行動指針（明日からできること）も添えてください。
-全体は400〜600字程度に収めてください。
+全体は600〜800字程度に収めてください。
 
 【相談者の占的】
 ${fortune}
@@ -549,7 +549,14 @@ ${userChart}
 1. 卦の本質（1〜2行）
 2. あなたへの教え（2〜3行）
 3. 行動指針（1〜2行）
-4. 四雲からの一言`;
+4. 四雲からの一言
+
+【深掘りの指示（最も重要）】
+・「一般的な占いの答え」ではなく「この相談者にだけ宛てた解釈」にすること。
+・ユーザーカルテの過去履歴・同本卦の過去記録を必ず参照し、「前回との違い」「変化の流れ」「繰り返されるテーマ」を指摘すること。
+・相談者が「はっ」と気づくような、的を射た「盲点」または「逆説」を1つ必ず含めること。
+・行動指針は「明日、実際にできる具体的な行動」に限定。抽象的な「自分を信じましょう」「前向きに考えましょう」のような誰でも言える表現は禁止。
+・変爻（特に主爻）が象徴する意味を深く掘り下げること。`;
 
     return prompt;
   }
@@ -579,7 +586,7 @@ ${userChart}
           { role: "user", content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 1000
+        max_tokens: 2000
       })
     });
 
