@@ -27,15 +27,96 @@
   const aiArea = $("ai-area");
   const aiOutput = $("ai-output");
   const btnAi = $("btn-ai");
-  const dataStatus = $("data-status");
   const fortuneText = $("fortune-text");
   const inputCount = $("input-count");
+
+  // 一般モード用DOM
+  const resultAreaSimple = $("result-area-simple");
+  const resultSimpleEl = $("result-simple");
+  const yaojiAreaSimple = $("yaoji-area-simple");
+  const yaojiSimpleEl = $("yaoji-simple");
+  const progressEl = $("progress");
+  const ceremonyNote = $("ceremony-note");
+  const btnModeToggle = $("btn-mode-toggle");
+  const modeSwitchLabel = $("mode-switch-label");
+  const introSimpleHead = $("intro-simple-head");
+  const introSimpleBody = $("intro-simple-body");
+  const introFoldIcon = $("intro-fold-icon");
+  const introSimple = $("intro-simple");
+  const introAcademic = $("intro-academic");
+  const testArea = $("test-area");
 
   // ---------- 状態 ----------
   let values = [];      // 得られた爻値（初爻→上爻）
   let tossCount = 0;    // 投げた回数
   let isBusy = false;   // 忙しいフラグ
   let lastResult = null; // 最後の占い結果（履歴保存用）
+
+  // ---------- モード管理 ----------
+  const MODE_KEY = "eki-sen-ui-mode";
+  const CEREMONY_KEY = "eki-sen-ceremony-done";
+  let uiMode = "simple";   // "simple" | "academic"
+
+  function getUIMode() {
+    try {
+      const saved = localStorage.getItem(MODE_KEY);
+      if (saved === "academic" || saved === "simple") return saved;
+    } catch (e) {}
+    return "simple";
+  }
+
+  function setUIMode(mode) {
+    uiMode = mode;
+    try { localStorage.setItem(MODE_KEY, mode); } catch (e) {}
+    applyUIMode();
+  }
+
+  function isCeremonyDone() {
+    try { return localStorage.getItem(CEREMONY_KEY) === "1"; } catch (e) { return false; }
+  }
+
+  function markCeremonyDone() {
+    try { localStorage.setItem(CEREMONY_KEY, "1"); } catch (e) {}
+  }
+
+  // 表示モードをUIに反映
+  function applyUIMode() {
+    const academic = uiMode === "academic";
+
+    // 説明
+    if (introSimple) introSimple.style.display = academic ? "none" : "block";
+    if (introAcademic) introAcademic.style.display = academic ? "block" : "none";
+
+    // 結果・爻辞
+    if (resultAreaSimple) resultAreaSimple.style.display = !academic && resultAreaSimple.querySelector(".simple-result") ? "block" : "none";
+    if (resultArea) resultArea.style.display = academic && resultEl.innerHTML ? "block" : "none";
+    if (yaojiAreaSimple) yaojiAreaSimple.style.display = !academic && yaojiSimpleEl.innerHTML ? "block" : "none";
+    if (yaojiArea) yaojiArea.style.display = academic && yaojiEl.innerHTML ? "block" : "none";
+
+    // モード切替ラベル
+    if (modeSwitchLabel) {
+      modeSwitchLabel.textContent = academic
+        ? "学術モード（易の専門家向け）で表示中"
+        : "一般の方向けの表示にしています";
+    }
+    if (btnModeToggle) {
+      btnModeToggle.classList.toggle("academic", academic);
+      btnModeToggle.textContent = academic ? "かんたんモードに切り替える" : "学術モードに切り替える";
+    }
+
+    // 儀式ノート（初回のみ表示）
+    if (ceremonyNote) {
+      ceremonyNote.style.display = (!academic && !isCeremonyDone()) ? "block" : "none";
+    }
+
+    // コインの初期表示（一般モードでは進捗を隠す）
+    if (progressEl) {
+      progressEl.style.display = (!academic && values.length === 0) ? "none" : "block";
+    }
+
+    // 履歴を再描画
+    showHistory();
+  }
 
   // ---------- 占的テキスト ----------
   const MAX_TEXT = 200;
@@ -125,17 +206,40 @@
       return;
     }
 
+    const academic = uiMode === "academic";
+    const escLt = "&l" + "t;";
+    const escGt = "&g" + "t;";
+    const escAmp = "&a" + "mp;";
+
     // 新しい順に表示
     const rows = [...history].reverse().map((h, i) => {
       const d = new Date(h.ts);
       const dateStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      const fortune = h.fortune ? `<div class="history-fortune">${h.fortune}</div>` : "";
+      const aiText = h.aiText ? '<div class="history-ai"><b>AI解釈</b><br>' + h.aiText.replace(/&/g, escAmp).replace(/</g, escLt).replace(/>/g, escGt) + '</div>' : "";
+
+      // 一般モード：シンボル・卦名の視覚表示
+      if (!academic) {
+        const honSym = h.honkaku ? `<span class="history-symbol">${h.honkaku.symbol || "☯"}</span>` : "";
+        const honName = h.honkaku ? `<b>${h.honkaku.name}</b>` : "—";
+        const shiName = h.shikaku && h.henyo && h.henyo.length > 0
+          ? ` <span class="history-arrow">→</span> ${h.shikaku.name}`
+          : "";
+        return `
+          <div class="history-item-simple">
+            ${honSym}
+            <div class="history-info">
+              <div class="history-date-simple">${dateStr}</div>
+              <div class="history-kua-simple">${honName}${shiName}</div>
+              ${fortune}
+            </div>
+          </div>
+        `;
+      }
+
+      // 学術モード：従来の詳細表示
       const hon = h.honkaku ? `<b>${h.honkaku.name}</b>（第${h.honkaku.n}卦）` : "—";
       const shi = h.shikaku ? `${h.shikaku.name}（第${h.shikaku.n}卦）` : "—";
-      const fortune = h.fortune ? `<div class="history-fortune">${h.fortune}</div>` : "";
-      const escLt = "&l" + "t;";
-      const escGt = "&g" + "t;";
-      const escAmp = "&a" + "mp;";
-      const aiText = h.aiText ? '<div class="history-ai"><b>AI解釈</b><br>' + h.aiText.replace(/&/g, escAmp).replace(/</g, escLt).replace(/>/g, escGt) + '</div>' : "";
       return `
         <div class="history-item">
           <div class="history-date">${dateStr}</div>
@@ -203,14 +307,11 @@
 
   // ---------- データ読み込み確認 ----------
   function checkData() {
-    if (R64 && R64.kua && R64.kua.length === 64) {
-      const yaoCount = mergeYaoji();
-      dataStatus.textContent = `✓ 六十四卦データ ロード済み（64卦 / ${yaoCount}爻辞）`;
-      dataStatus.classList.add("loaded");
-      return true;
+    if (!R64 || !R64.kua || R64.kua.length !== 64) {
+      return false;
     }
-    dataStatus.textContent = "⚠ 六十四卦データの読み込みに失敗";
-    return false;
+    mergeYaoji();
+    return true;
   }
 
   // ---------- コイン表示 ----------
@@ -280,6 +381,231 @@
     `;
   }
 
+  // ---------- 一般モード：卦の図（六爻の縦表示） ----------
+  function yaoFigureHTML(c, shape) {
+    const bars = [];
+    for (let i = 5; i >= 0; i--) {
+      const isYang = shape[i] === "1";
+      const isHen = c.henyoPositions.includes(i + 1);
+      const name = Kakei.YAO_NAMES[i];
+      bars.push(`
+        <div class="simple-yao">
+          <span class="simple-yao-name">${name}</span>
+          <div class="simple-yao-bar ${isYang ? "yang" : "yin"} ${isHen ? "henyo" : ""}"></div>
+          <span class="simple-yao-parenthesis">${isHen ? "◆" : ""}</span>
+        </div>
+      `);
+    }
+    return `<div class="simple-yao-list">${bars.join("")}</div>`;
+  }
+
+  // ---------- 一般モード：結果表示 ----------
+  function showSimpleResult(result, c, fortune) {
+    const hon = c.honkaku;
+    const shi = c.shikaku;
+    const catchMsg = CATCH_MESSAGES && CATCH_MESSAGES[hon.n] ? CATCH_MESSAGES[hon.n] : "";
+
+    let html = `<div class="simple-result">`;
+
+    // 占意表示
+    if (fortune) {
+      html += `<div class="fortune-display" style="margin-bottom:16px;"><b>占意：</b>${fortune}</div>`;
+    }
+
+    // 本卦パネル
+    html += `<div class="simple-kua-panel honkaku">`;
+    html += `<span class="simple-kua-label">現在のあなた（本卦）</span>`;
+    html += `<span class="simple-kua-symbol">${hon.symbol}</span>`;
+    html += `<div class="simple-kua-name">${hon.name}</div>`;
+    html += `<div class="simple-kua-number">第${hon.n}卦</div>`;
+    if (catchMsg) html += `<div class="simple-kua-catch">🏮 ${catchMsg}</div>`;
+    html += `<div class="simple-kua-junsei">${hon.kaji_gendai}</div>`;
+    html += yaoFigureHTML(c, result.shape);
+    if (c.henyoPositions.length > 0) {
+      html += `<div class="henyo-row" style="margin-top:6px;"><b>変爻：</b>${c.henyoPositions.map(p => Kakei.YAO_NAMES_BY_POS[p]).join("・")}</div>`;
+    }
+    html += `</div>`;
+
+    // 変化の矢印（変爻がある場合）
+    if (c.henyoPositions.length > 0 && shi) {
+      html += `<div class="simple-arrow">↓</div>`;
+      html += `<div class="simple-arrow-label">変化した先の未来</div>`;
+      html += `<div class="simple-kua-panel shikaku">`;
+      html += `<span class="simple-kua-label">変化した未来（之卦）</span>`;
+      html += `<span class="simple-kua-symbol">${shi.symbol}</span>`;
+      html += `<div class="simple-kua-name">${shi.name}</div>`;
+      html += `<div class="simple-kua-number">第${shi.n}卦</div>`;
+      html += `<div class="simple-kua-junsei">${shi.kaji_gendai}</div>`;
+      html += yaoFigureHTML(c, c.shikakuShape);
+      html += `</div>`;
+    }
+
+    // 変卦（賓卦・裏卦・互卦）を簡素に折りたたみ表示
+    const henCards = [
+      { label: "相手から見たあなた", kua: c.hinkaku, shape: c.hinkakuShape },
+      { label: "隠れた本音・本質", kua: c.rikaku, shape: c.rikakuShape },
+      { label: "今まさに内部で起きていること", kua: c.goko, shape: c.gokoShape }
+    ].filter(h => h.kua).map(h => {
+      const voice = h.kua.kaji_voice ? `<div class="simple-henkaku-voice">「${h.kua.kaji_voice}」</div>` : "";
+      return `
+        <div class="simple-henkaku-card">
+          <h4>${h.label}</h4>
+          <span class="simple-henkaku-symbol">${h.kua.symbol}</span>
+          <div class="simple-henkaku-name">${h.kua.name}</div>
+          <div class="simple-henkaku-num">第${h.kua.n}卦</div>
+          <div class="simple-henkaku-gendai">${h.kua.kaji_gendai}</div>
+          ${voice}
+        </div>
+      `;
+    }).join("");
+
+    html += `
+      <div class="simple-henkaku-fold">
+        <button type="button" class="simple-fold-toggle" aria-expanded="false">
+          <span class="fold-icon">▸</span> この卦の奥行きを見る
+        </button>
+        <div class="simple-fold-body">
+          <div class="simple-henkaku-grid">${henCards}</div>
+          <p class="simple-henkaku-note">これらの卦の関係は複雑です。詳しく知りたい方は式神による詳細鑑定をご利用ください。</p>
+        </div>
+      </div>
+    `;
+
+    html += `</div>`;
+
+    resultSimpleEl.innerHTML = html;
+    resultAreaSimple.style.display = "block";
+
+    // 折りたたみトグル
+    const foldToggle = resultSimpleEl.querySelector(".simple-fold-toggle");
+    if (foldToggle) {
+      foldToggle.addEventListener("click", () => {
+        const expanded = foldToggle.getAttribute("aria-expanded") === "true";
+        foldToggle.setAttribute("aria-expanded", String(!expanded));
+        const body = foldToggle.nextElementSibling;
+        body.style.display = expanded ? "none" : "block";
+        const icon = foldToggle.querySelector(".fold-icon");
+        if (icon) icon.textContent = expanded ? "▸" : "▾";
+      });
+    }
+
+    // スクロール
+    resultAreaSimple.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ---------- 一般モード：お告げ（現代語訳を大きく） ----------
+  function showSimpleYaoji(result) {
+    const rule = Chusekiho.shushiRule(result.henIdx, result.calc);
+    if (!rule) {
+      yaojiAreaSimple.style.display = "none";
+      return;
+    }
+
+    const honCatch = CATCH_MESSAGES && CATCH_MESSAGES[result.calc.honkaku.n]
+      ? CATCH_MESSAGES[result.calc.honkaku.n] : "";
+
+    let html = `<div class="simple-yaoji-rule">📖 ${rule.description}</div>`;
+    if (honCatch) {
+      html += `<div class="kua-catch">🏮 ${honCatch}</div>`;
+    }
+    html += `<div class="yaoji-oracle">天はあなたにこう告げている ——</div>`;
+
+    const showKaji = rule.rule === "zero" || rule.rule === "three" || rule.rule === "six";
+
+    if (showKaji) {
+      const honVoice = result.calc.honkaku.kaji_voice ? `<div class="simple-yaoji-voice">「 ${result.calc.honkaku.kaji_voice} 」</div>` : "";
+      const shiVoice = result.calc.shikaku && result.calc.shikaku.kaji_voice ? `<div class="simple-yaoji-voice">「 ${result.calc.shikaku.kaji_voice} 」</div>` : "";
+      if (rule.rule === "zero") {
+        html += `<div class="simple-yaoji-card main">
+          <div class="simple-yaoji-label">本卦の卦辞</div>
+          <div class="simple-yaoji-gendai">${result.calc.honkaku.kaji_gendai}</div>
+          <hr class="simple-yaoji-divider">
+          <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">原文</span>${result.calc.honkaku.kaji}</div>
+          <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">読み</span>${result.calc.honkaku.kaji_yaku}</div>
+          ${honVoice}
+        </div>`;
+      } else if (rule.rule === "three") {
+        html += `<div class="simple-yaoji-card main">
+          <div class="simple-yaoji-label">本卦の卦辞</div>
+          <div class="simple-yaoji-gendai">${result.calc.honkaku.kaji_gendai}</div>
+          <hr class="simple-yaoji-divider">
+          <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">原文</span>${result.calc.honkaku.kaji}</div>
+          <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">読み</span>${result.calc.honkaku.kaji_yaku}</div>
+          ${honVoice}
+        </div>`;
+        html += `<div class="simple-yaoji-card jun">
+          <div class="simple-yaoji-label">変化した卦（之卦）の卦辞</div>
+          <div class="simple-yaoji-gendai">${result.calc.shikaku.kaji_gendai}</div>
+          <hr class="simple-yaoji-divider">
+          <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">原文</span>${result.calc.shikaku.kaji}</div>
+          <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">読み</span>${result.calc.shikaku.kaji_yaku}</div>
+          ${shiVoice}
+        </div>`;
+      } else if (rule.rule === "six") {
+        if (result.calc.honkaku.n === 1) {
+          html += `<div class="simple-yaoji-card main">
+            <div class="simple-yaoji-label">乾 用九</div>
+            <div class="simple-yaoji-gendai">集団の中で自分だけ秀でようとしないのが良い。</div>
+            <hr class="simple-yaoji-divider">
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">原文</span>見群龍无首。吉。</div>
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">読み</span>群れの竜を見て、首（頭）をわざわざ出すことがない。吉。</div>
+            <div class="simple-yaoji-voice">「首を出さず群れの龍、吉なり」</div>
+          </div>`;
+        } else if (result.calc.honkaku.n === 2) {
+          html += `<div class="simple-yaoji-card main">
+            <div class="simple-yaoji-label">坤 用六</div>
+            <div class="simple-yaoji-gendai">「永く」（いつまでも続けられるよう）正しくあれ、という意味。</div>
+            <hr class="simple-yaoji-divider">
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">原文</span>利永貞。</div>
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">読み</span>永く正しきに利ろし。</div>
+            <div class="simple-yaoji-voice">「永く正しく、静かに地の如く」</div>
+          </div>`;
+        } else {
+          html += `<div class="simple-yaoji-card main">
+            <div class="simple-yaoji-label">変化した卦（之卦）の卦辞</div>
+            <div class="simple-yaoji-gendai">${result.calc.shikaku.kaji_gendai}</div>
+            <hr class="simple-yaoji-divider">
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">原文</span>${result.calc.shikaku.kaji}</div>
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">読み</span>${result.calc.shikaku.kaji_yaku}</div>
+            ${shiVoice}
+          </div>`;
+        }
+      }
+    } else {
+      // 爻辞を表示するケース（変爻1・2・4・5個）
+      rule.list.forEach(item => {
+        const kua = item.kua === "hon" ? result.calc.honkaku : result.calc.shikaku;
+        if (item.pos === null) return;
+
+        const yaoName = Kakei.YAO_NAMES[item.pos];
+        const displayName = Kakei.yaoDisplayName(kua, item.pos);
+        const yaoData = (kua.yao && kua.yao[item.pos]) ? kua.yao[item.pos] : null;
+
+        const cls = item.main ? "main" : "jun";
+        const label = (item.kua === "hon" ? "本卦" : "之卦") + " " + yaoName + "（" + displayName + "）" + (item.main ? " 〔主爻〕" : " 〔従爻〕");
+
+        if (yaoData) {
+          html += `<div class="simple-yaoji-card ${cls}">
+            <div class="simple-yaoji-label">${label}</div>
+            <div class="simple-yaoji-gendai">${yaoData.gendai}</div>
+            <hr class="simple-yaoji-divider">
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">原文</span>${yaoData.kambun}</div>
+            <div class="simple-yaoji-orthodox"><span class="simple-yaoji-orthodox-label">読み</span>${yaoData.yaku}</div>
+            ${yaoData.voice ? `<div class="simple-yaoji-voice">「 ${yaoData.voice} 」</div>` : ""}
+          </div>`;
+        } else {
+          html += `<div class="simple-yaoji-card ${cls}">
+            <div class="simple-yaoji-label">${label}</div>
+            <div class="simple-yaoji-gendai" style="color:#a82b2b;">※ この爻辞はデータ未収録です。易経をご参照ください。</div>
+          </div>`;
+        }
+      });
+    }
+
+    yaojiSimpleEl.innerHTML = html;
+    yaojiAreaSimple.style.display = "block";
+  }
+
   // ---------- 結果表示 ----------
   function showResult() {
     const result = Chusekiho.fortune();
@@ -294,6 +620,27 @@
 
     // 占的テキスト取得
     const fortune = getFortuneText();
+
+    // 一般モードなら簡易表示へ
+    if (uiMode === "simple") {
+      // 初回占い完了を記録（次回からは「一気に占う」を表示）
+      markCeremonyDone();
+      if (ceremonyNote) ceremonyNote.style.display = "none";
+
+      showSimpleResult(result, c, fortune);
+      showSimpleYaoji(result);
+      lastResult = {
+        ts: new Date().toISOString(),
+        fortune: fortune,
+        honkaku: c.honkaku ? { n: c.honkaku.n, name: c.honkaku.name } : null,
+        shikaku: c.shikaku ? { n: c.shikaku.n, name: c.shikaku.name } : null,
+        henyo: c.henyoPositions,
+        kaji: c.honkaku ? c.honkaku.kaji : ""
+      };
+      saveHistory(lastResult);
+      aiArea.style.display = "block";
+      return;
+    }
 
     // 変爻表示
     let henyoText;
@@ -378,119 +725,61 @@
     aiArea.style.display = "block";
   }
 
-  // ---------- 無料回数管理（localStorage） ----------
-  function getAICredit() {
-    try {
-      return parseInt(localStorage.getItem("ai-credit-used") || "0", 10);
-    } catch (e) {
-      return 0;
-    }
-  }
-
-  function setAICredit(count) {
-    try {
-      localStorage.setItem("ai-credit-used", String(count));
-    } catch (e) {}
-  }
-
+  // ---------- 無料回数管理（DBで管理するため、表示は固定案内のみ） ----------
   function updateAICreditDisplay() {
     const el = $("ai-credit");
     if (!el) return;
-    const used = getAICredit();
-    // 初回のみ無料
-    if (used === 0) {
-      el.innerHTML = `<span class="ai-credit-free">🎁 初回は無料です。気軽にお試しください。</span>`;
+    const loggedIn = !!(window.AppSupabase && window.AppSupabase.user);
+    if (loggedIn) {
+      // ログイン済み：導線はボタンに委ね、余計な告知は控える
+      el.innerHTML = ``;
     } else {
-      el.innerHTML = `<span class="ai-credit-used">ご利用回数：${used}回 ／ 2回目以降は有料（近日実装予定）</span>`;
+      el.innerHTML = `<span class="ai-credit-free">※ 式神の託宣にはログインが必要です。</span>`;
     }
   }
 
-  // ---------- ユーザーカルテ生成（全履歴から要約・最大5000文字） ----------
-  function buildUserChart() {
-    const history = getHistory();
-    if (history.length === 0) return "";
-    const MAX_CHART = 5000;
-    let chart = "";
+  // ---------- 式神解釈: Worker 経由で呼び出し（プロンプト・APIキーはサーバー側に秘匿） ----------
+  const AI_WORKER_URL = "https://eki-sen-ai-proxy.hiromun39.workers.dev";
 
-    // ① 基本プロフィール
-    const first = new Date(history[0].ts);
-    const total = history.length;
-    const aiCount = history.filter(h => h.aiText).length;
-    const henyoTotal = history.reduce((s, h) => s + (h.henyo ? h.henyo.length : 0), 0);
-    chart += `【ユーザーカルテ】\n`;
-    chart += `初回利用: ${first.getFullYear()}/${String(first.getMonth() + 1).padStart(2, "0")}/${String(first.getDate()).padStart(2, "0")}／総占い${total}件／AI解釈${aiCount}回／変爻延べ${henyoTotal}個\n`;
-    chart += `【占い履歴（新しい順・AI解釈は要旨を含む）】\n`;
-
-    // ② エントリリスト（AI解釈済みを優先して詳細・古いものは圧縮）
-    const entries = [...history].reverse().map(h => {
-      const d = new Date(h.ts);
-      const dateStr = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-      const hon = h.honkaku ? h.honkaku.name : "?";
-      const shi = h.shikaku ? "→" + h.shikaku.name : "";
-      const henyo = h.henyo && h.henyo.length > 0 ? `変爻${h.henyo.join(",")}` : "変爻なし";
-      const fortune = (h.fortune || "").slice(0, 30);
-      const isTest = /テスト|試験|デモ/i.test(h.fortune || "");
-      // エントリ文字列（AI解釈は要旨を付ける）
-      let entry = `[${dateStr}] ${fortune} / ${hon}${shi} / ${henyo}`;
-      if (h.aiText) {
-        // AI解釈の核心（最初の段落・本文から200文字）
-        const ai = (h.aiText || "").replace(/\s+/g, " ").slice(0, 200);
-        entry += `\n  AI: ${ai}`;
-      } else if (isTest) {
-        entry = `[${dateStr}] テスト ${hon}${shi}`;
-      }
-      return { h, entry, isTest };
+  async function callAIWorker(accessToken, payload) {
+    const res = await fetch(AI_WORKER_URL + "/api/ai", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(payload)
     });
 
-    // 文字数制限に合わせてエントリを調整
-    let assembled = "";
-    // まずAI解釈ありを優先、次に通常、最後にテスト
-    const aiEntries = entries.filter(e => e.h.aiText);
-    const normalEntries = entries.filter(e => !e.h.aiText && !e.isTest);
-    const testEntries = entries.filter(e => e.isTest && !e.h.aiText);
+    const data = await res.json().catch(() => ({}));
 
-    for (const group of [aiEntries, normalEntries]) {
-      for (const e of group) {
-        if (assembled.length + e.entry.length > MAX_CHART) break;
-        assembled += e.entry + "\n";
+    if (!res.ok) {
+      // 402 = 有料プラン必要（初回無料を使い切った）
+      if (res.status === 402) {
+        const err = new Error(data.error || "初回の無料枠はご利用済みです。");
+        err.code = "PAYMENT_REQUIRED";
+        throw err;
       }
-    }
-    // テスト系は最後に（スペースがある場合のみ）
-    for (const e of testEntries) {
-      if (assembled.length + e.entry.length + 100 > MAX_CHART) break;
-      assembled += e.entry + "\n";
-    }
-
-    chart += assembled;
-    // ③ 同本卦の過去記録（現在の本卦と被る過去履歴）
-    const sameKua = history.filter(h =>
-      h.honkaku && lastResult && h.honkaku.n === lastResult.honkaku.n &&
-      h.ts !== lastResult.ts
-    );
-    if (sameKua.length > 0) {
-      chart += `\n【同本卦の過去記録】`;
-      sameKua.slice(-2).forEach(h => {
-        const d = new Date(h.ts);
-        const dateStr = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-        chart += `\n[${dateStr}] 占的「${(h.fortune || "").slice(0, 30)}」 / ${h.honkaku.name}${h.shikaku ? "→" + h.shikaku.name : ""} / 変爻:${h.henyo && h.henyo.length > 0 ? h.henyo.join(",") : "なし"}`;
-      });
-      chart += `\n※ 同じ本卦の過去記録を参考に、前回との違いに注目して解釈すること。`;
+      if (res.status === 401) {
+        const err = new Error(data.error || "ログインが必要です。");
+        err.code = "NOT_AUTHENTICATED";
+        throw err;
+      }
+      throw new Error(data.error || `エラー (${res.status})`);
     }
 
-    // 全体を5000文字に制限
-    return chart.slice(0, MAX_CHART);
+    if (!data.text) throw new Error("応答が空でした。");
+    return data.text;
   }
 
-  // ---------- プロンプト構築 ----------
-  function buildAIPrompt() {
+  // 式神解釈のリクエストデータ構築（占い結果をサーバーへ送る）
+  function buildAIRequestPayload() {
     const result = Chusekiho.fortune();
     result.values = values;
     result.shape = Chusekiho.shapeFromValues(values);
     result.henIdx = Chusekiho.henIndicesFromValues(values);
     result.calc = Kakei.calcAll(result.shape, result.henIdx);
     const c = result.calc;
-    const hon = c.honkaku;
-    const fortune = getFortuneText();
 
     // 読むべき爻辞（朱子ルール）
     let yaojiText = "";
@@ -507,191 +796,68 @@
         }
       });
     } else {
-      yaojiText = `本卦 卦辞: ${hon.kaji} / 現代語訳: ${hon.kaji_gendai} / 天の声: ${hon.kaji_voice || "なし"}`;
+      yaojiText = `本卦 卦辞: ${c.honkaku.kaji} / 現代語訳: ${c.honkaku.kaji_gendai} / 天の声: ${c.honkaku.kaji_voice || "なし"}`;
     }
 
-    // ユーザーカルテ（全履歴から要約・最大5000文字）を組み込む
-    const userChart = buildUserChart();
+    // 変卦（賓卦・裏卦・互卦）の参考情報
+    const henRef = [
+      c.hinkaku ? `賓卦: ${c.hinkaku.name}（第${c.hinkaku.n}卦） 相手側から見たあなたの姿` : "",
+      c.rikaku ? `裏卦: ${c.rikaku.name}（第${c.rikaku.n}卦） 隠れた本質` : "",
+      c.goko ? `互卦: ${c.goko.name}（第${c.goko.n}卦） 内部で進行中の事情` : ""
+    ].filter(Boolean).join("\n");
 
-    const prompt = `あなたは、安倍晴明・村上源氏の正統なる血脈を引く現代の陰陽師「四雲（シウン）」です。
-西洋占星術と易・陰陽道を統合し、人生の呪縛や障りを可能な限り一撃で解くことを目指す高潔なスタイルです。
-画面の向こうの相談者を「大切な同輩」として扱い、おざなりな作業はしません。
-
-【口調ルール（最も重要）】
-・武士や古文のような堅苦しい言葉遣いは禁止。
-・「あなた」「〜ですね」「〜しましょう」等、親しみやすく温かい現代口語を基本とする。
-・品格と格式は保つが、それは「丁寧で思いやりのある語り口」として表現する。
-・「〜にございます」「〜でござる」のような過度な古語は使わない。ほんの少しの和の趣（例:「〜です」「〜ですね」）に留める。
-・尊敬語・丁寧語は使いすぎず、自然に。
-
-【依頼】
-以下の易占の結果について、相談者の悩みを長期的に理解した上で、温かみのある正確な統合解釈をしてください。
-文末には具体的な行動指針（明日からできること）も添えてください。
-全体は600〜800字程度に収めてください。
-
-【相談者の占的】
-${fortune}
-
-【立卦結果】
-本卦: ${hon.name}（第${hon.n}卦） ${hon.symbol}
-本卦の象徴: ${hon.kaji_gendai}
-${c.henyoPositions.length > 0 ? `之卦: ${c.shikaku.name}（第${c.shikaku.n}卦） ${c.shikaku.symbol}
-之卦の象徴: ${c.shikaku.kaji_gendai}` : "変爻なし"}
-変爻: ${c.henyoPositions.length > 0 ? c.henyoPositions.join(",") : "なし"}
-
-【読むべき爻辞・卦辞】
-${yaojiText}
-
-【ユーザーカルテ】
-${userChart}
-
-【出力形式】
-1. 卦の本質（1〜2行）
-2. あなたへの教え（2〜3行）
-3. 行動指針（1〜2行）
-4. 四雲からの一言
-
-【深掘りの指示（最も重要）】
-・「一般的な占いの答え」ではなく「この相談者にだけ宛てた解釈」にすること。
-・ユーザーカルテの過去履歴・同本卦の過去記録を必ず参照し、「前回との違い」「変化の流れ」「繰り返されるテーマ」を指摘すること。
-・相談者が「はっ」と気づくような、的を射た「盲点」または「逆説」を1つ必ず含めること。
-・行動指針は「明日、実際にできる具体的な行動」に限定。抽象的な「自分を信じましょう」「前向きに考えましょう」のような誰でも言える表現は禁止。
-・変爻（特に主爻）が象徴する意味を深く掘り下げること。`;
-
-    return prompt;
+    return {
+      fortune: getFortuneText(),
+      values: values,
+      honkaku: c.honkaku ? { n: c.honkaku.n, name: c.honkaku.name, symbol: c.honkaku.symbol, kaji_gendai: c.honkaku.kaji_gendai } : null,
+      shikaku: c.shikaku ? { n: c.shikaku.n, name: c.shikaku.name, symbol: c.shikaku.symbol, kaji_gendai: c.shikaku.kaji_gendai } : null,
+      henIndex: c.henyoPositions,
+      yaojiText: yaojiText,
+      henRef: henRef
+    };
   }
 
-  // ---------- API呼び出し ----------
-  async function callAI(provider, apiKey, prompt) {
-    let endpoint, model;
-    if (provider === "openai") {
-      endpoint = "https://api.openai.com/v1/chat/completions";
-      model = "gpt-4o-mini";
-    } else {
-      // DeepSeek (OpenAI互換)
-      endpoint = "https://api.deepseek.com/chat/completions";
-      model = "deepseek-chat";
-    }
-
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "system", content: "あなたは現代的易占のエキスパート。陰陽師・四雲として、温かみがあり品格のある現代日本語で回答する。堅苦しい文語調は避け、一般の相談者に自然に伝わる語り口で。" },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`APIエラー (${res.status}): ${err.slice(0, 200)}`);
-    }
-
-    const data = await res.json();
-    return data.choices && data.choices[0] && data.choices[0].message
-      ? data.choices[0].message.content
-      : "(応答が空でした)";
-  }
-
-  // ---------- 「解釈する」ボタン ----------
+  // ---------- 「式神の託宣を受ける」ボタン ----------
   async function onAiClick() {
     if (isBusy || values.length < 6) return;
     isBusy = true;
     btnAi.disabled = true;
 
-    const provider = $("ai-provider") ? $("ai-provider").value : "deepseek";
-    const apiKey = $("api-key") ? $("api-key").value.trim() : "";
-
-    aiOutput.innerHTML = `<p class="hint">🔮 四雲先生が占意を読み解いています…</p>`;
+    aiOutput.innerHTML = `<p class="hint">🔮 四雲先生の式神が占意を読み解いています…</p>`;
 
     try {
-      // APIキー未入力 → ローカルモック（無料体験用）
-      if (!apiKey) {
-        const prompt = buildAIPrompt();
-        // ローカルで仮のAI応答を生成（キー入力で実AI）
-        const local = generateLocalMock(prompt);
-        setTimeout(() => {
-          aiOutput.innerHTML = renderAIResponse(local);
-          // 無料回数カウント（初回のみ）
-          const used = getAICredit();
-          if (used === 0) setAICredit(1);
-          updateAICreditDisplay();
-          // AI解釈を履歴に保存（モック）
-          saveAIResult(local, "mock");
-          isBusy = false;
-          btnAi.disabled = false;
-          aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 800);
-        return;
+      // ログイン必須（初回無料はログインが必要）
+      if (!window.AppSupabase || !window.AppSupabase.user) {
+        const err = new Error("式神の託宣を受けるにはログインが必要です。");
+        err.code = "NOT_AUTHENTICATED";
+        throw err;
+      }
+      const accessToken = await window.AppSupabase.getAccessToken();
+      if (!accessToken) {
+        const err = new Error("ログインセッションを取得できませんでした。再ログインしてください。");
+        err.code = "NOT_AUTHENTICATED";
+        throw err;
       }
 
-      // APIキー入力あり → 実AI呼び出し
-      const prompt = buildAIPrompt();
-      const response = await callAI(provider, apiKey, prompt);
-      // ローカル生成が成功したので無料回数カウント
-      const used = getAICredit();
-      if (used === 0) setAICredit(1);
-      updateAICreditDisplay();
-      // AI解釈を履歴に保存（API）
-      saveAIResult(response, "api");
+      const payload = buildAIRequestPayload();
+      const response = await callAIWorker(accessToken, payload);
+
+      // AI解釈を履歴に保存
+      saveAIResult(response, "ai");
       aiOutput.innerHTML = renderAIResponse(response);
       aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
-      aiOutput.innerHTML = `<p class="ai-error">⚠️ エラー: ${err.message}</p><p class="hint">APIキーが正しいか、プロバイダを確認してください。</p>`;
+      if (err.code === "PAYMENT_REQUIRED") {
+        aiOutput.innerHTML = `<p class="ai-error">⚠️ ${err.message}</p><p class="hint">2回目以降の利用は有料プラン（近日実装予定）になります。よろしければ四雲先生の本鑑定をご検討ください。</p>`;
+      } else if (err.code === "NOT_AUTHENTICATED") {
+        aiOutput.innerHTML = `<p class="ai-error">🔐 ${err.message}</p><p class="hint">無料ログイン（Google連携）で、初回の式神の託宣を無料でお試しいただけます。占い結果も自動で履歴に保存されます。</p>`;
+      } else {
+        aiOutput.innerHTML = `<p class="ai-error">⚠️ エラー: ${err.message}</p><p class="hint">時間をおいて再度お試しください。</p>`;
+      }
     } finally {
       isBusy = false;
       btnAi.disabled = false;
     }
-  }
-
-  // ---------- ローカルモック生成（APIキー未入力時） ----------
-  function generateLocalMock(prompt) {
-    const result = Chusekiho.fortune();
-    result.values = values;
-    result.shape = Chusekiho.shapeFromValues(values);
-    result.henIdx = Chusekiho.henIndicesFromValues(values);
-    result.calc = Kakei.calcAll(result.shape, result.henIdx);
-    const c = result.calc;
-    const hon = c.honkaku;
-    const catchMsg = CATCH_MESSAGES && CATCH_MESSAGES[hon.n] ? CATCH_MESSAGES[hon.n] : "";
-
-    const fortune = getFortuneText();
-    let text = "";
-    text += `本卦「${hon.name}」（第${hon.n}卦）が告げるのは──\n\n`;
-    if (catchMsg) text += `🏮 ${catchMsg}\n\n`;
-    if (c.henyoPositions.length === 0) {
-      text += `変爻はなく、天は卦全体の卦辞にだけ答えを込めています。\n「${hon.kaji}」\n${hon.kaji_gendai}\n\n`;
-    } else {
-      const henyao = c.henyoPositions.map(p => {
-        return `${Kakei.YAO_NAMES_BY_POS[p]}（${Chusekiho.yaoInfo(values[p-1]).name}）`;
-      }).join("と");
-      text += `変爻は${henyao}。これらの爻があなたの現状に強く働きかけています。\n\n`;
-      const rule = Chusekiho.shushiRule(result.henIdx, c);
-      if (rule) {
-        rule.list.forEach(item => {
-          if (item.pos === null) return;
-          const kua = item.kua === "hon" ? c.honkaku : c.shikaku;
-          const yaoData = kua.yao && kua.yao[item.pos] ? kua.yao[item.pos] : null;
-          if (yaoData) {
-            const label = (item.kua === "hon" ? "本卦" : "之卦") + " " + Kakei.YAO_NAMES[item.pos] + (item.main ? "〔主〕" : "〔従〕");
-            text += `${label}: ${yaoData.kambun}\n現代訳: ${yaoData.gendai}\n天の声: ${yaoData.voice || "なし"}\n\n`;
-          }
-        });
-      }
-    }
-    if (c.henyoPositions.length > 0) {
-      text += `将来は「${c.shikaku.name}」（第${c.shikaku.n}卦）へと向かいます。${c.shikaku.kaji_gendai}\n\n`;
-    }
-    text += `─── これは自動生成された参考解釈です。\nAPIキーを入力すると「四雲先生の統合解釈」が生成されます。`;
-    return text;
   }
 
   // ---------- API応答をHTML表示 ----------
@@ -699,7 +865,7 @@ ${userChart}
     const paragraphs = String(text).split(/\n+/).filter(p => p.trim() !== "");
     return `
       <div class="ai-mock">
-        <div class="ai-kami">✨ 陰陽師の統合解釈</div>
+        <div class="ai-kami">✨ 式神の託宣</div>
         ${paragraphs.map(p => {
           if (/^1\.|^2\.|^3\.|^4\./.test(p)) {
             return `<p class="ai-lead">${p}</p>`;
@@ -710,7 +876,7 @@ ${userChart}
           return `<p>${p}</p>`;
         }).join("")}
         <div class="ai-disclaimer">
-          <p>⚠️ これはAIが生成した参考解釈です。深い鑑定は四雲先生にご相談ください。</p>
+          <p>こちらは式神による参考解釈です。さらに深い鑑定は四雲先生にご相談ください。</p>
         </div>
       </div>
     `;
@@ -962,8 +1128,24 @@ ${userChart}
     resultEl.innerHTML = "";
     yaojiEl.innerHTML = "";
 
+    // 一般モード用もリセット
+    if (resultAreaSimple) resultAreaSimple.style.display = "none";
+    if (yaojiAreaSimple) yaojiAreaSimple.style.display = "none";
+    if (resultSimpleEl) resultSimpleEl.innerHTML = "";
+    if (yaojiSimpleEl) yaojiSimpleEl.innerHTML = "";
+
+    // 初回儀式でなければ進捗を隠す（一般モード）
+    if (progressEl) progressEl.style.display = uiMode === "simple" ? "none" : "block";
+    if (ceremonyNote) ceremonyNote.style.display = uiMode === "simple" && !isCeremonyDone() ? "block" : "none";
+
+    // ボタン：初回儀式モード（一度も占い完了していない場合）のみ「一気に占う」を隠す
+    if (isCeremonyDone() || uiMode === "academic") {
+      btnSkip.style.display = "inline-block";
+    } else {
+      btnSkip.style.display = "none";
+    }
     btnToss.style.display = "inline-block";
-    btnSkip.style.display = "inline-block";
+    btnReset.style.display = "none";
     btnToss.disabled = false;
     btnSkip.disabled = false;
   }
@@ -992,6 +1174,8 @@ ${userChart}
 
     // 認証状態監視
     if (window.AppSupabase) {
+      // 同期の二重実行防止フラグ
+      let isSyncing = false;
       window.AppSupabase.init(async (user) => {
         if (user) {
           // ログイン済み
@@ -1001,10 +1185,17 @@ ${userChart}
           authUser.textContent = `👤 ${name}`;
           authUser.style.display = "inline-block";
 
-          // DBから履歴を取得 → localStorage に反映して画面更新
-          await window.AppSupabase.fetchHistoryFromDB();
-          // localStorage の履歴（未同期分）をDBへアップロード
-          await window.AppSupabase.syncLocalToDB();
+          // 同期済みならスキップ（onAuthStateChange と getSession の二重呼び出し対策）
+          if (isSyncing) return;
+          isSyncing = true;
+          try {
+            // ① localStorage → DB へアップロード（先にローカルの未同期分を送る）
+            await window.AppSupabase.syncLocalToDB();
+            // ② DB → localStorage へ反映（最新の統合結果でローカルを更新）
+            await window.AppSupabase.fetchHistoryFromDB();
+          } finally {
+            isSyncing = false;
+          }
           showHistory();
         } else {
           // 未ログイン
@@ -1024,6 +1215,9 @@ ${userChart}
     isBusy = true;
     btnToss.disabled = true;
     btnSkip.disabled = true;
+
+    // 初回投げでプログレスを表示
+    if (tossCount === 0 && progressEl) progressEl.style.display = "block";
 
     const { coins, total } = Chusekiho.tossThree();
     setCoins(coins);
@@ -1056,16 +1250,11 @@ ${userChart}
     btnToss.disabled = true;
     btnSkip.disabled = true;
 
-    // 残り回数を投げる
+    // 残り回数を投げる（一気に占う場合はコインアニメなしで全6爻を確定させる）
     for (let i = tossCount; i < 6; i++) {
-      const { coins, total } = Chusekiho.tossThree();
+      const { total } = Chusekiho.tossThree();
       values.push(total);
       tossCount++;
-      // 最後の1回だけアニメ表示
-      if (i === 5) {
-        setCoins(coins);
-        showYaoResult(total);
-      }
     }
     updateSlots();
     btnToss.style.display = "none";
@@ -1082,6 +1271,37 @@ ${userChart}
   document.addEventListener("DOMContentLoaded", () => {
     try {
       if (!checkData()) return;
+
+      // モード初期化
+      uiMode = getUIMode();
+      applyUIMode();
+
+      // 初期化リセット（一気に占うボタンの表示判定を行う）
+      try { reset(); } catch (e) { console.error("初期resetエラー:", e); }
+
+      // テスト表示（?test=1 時のみ）
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("test") === "1" && testArea) testArea.style.display = "block";
+
+      // 説明の折りたたみ
+      if (introSimpleHead && introSimpleBody) {
+        introSimpleHead.addEventListener("click", () => {
+          const hidden = introSimpleBody.style.display === "none";
+          introSimpleBody.style.display = hidden ? "block" : "none";
+          if (introFoldIcon) introFoldIcon.classList.toggle("open", hidden);
+        });
+        // 初回儀式時は開いたまま
+        if (!isCeremonyDone()) introSimpleBody.style.display = "block";
+        else introSimpleBody.style.display = "none";
+      }
+
+      // モード切替
+      if (btnModeToggle) {
+        btnModeToggle.addEventListener("click", () => {
+          setUIMode(uiMode === "academic" ? "simple" : "academic");
+        });
+      }
+
       // 各初期化は例外を握りつぶして、ボタン登録を確実に行う
       try { initAuthArea(); } catch (e) { console.error("initAuthArea:", e); }
       try { initTestArea(); } catch (e) { console.error("initTestArea:", e); }

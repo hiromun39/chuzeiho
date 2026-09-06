@@ -1,0 +1,6 @@
+# 開発用の一時ファイル（本番には公開しない）
+restore.html
+
+# 環境依存ファイル
+.DS_Store
+Thumbs.db

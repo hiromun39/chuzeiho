@@ -19,8 +19,8 @@
   <!-- ヘッダー -->
   <header class="header">
     <div class="header-title">
-      <h1 class="title">中筮法</h1>
-      <p class="subtitle">周易六十四卦 ブラウザ占筮</p>
+      <h1 class="title"><span class="brand-name">易聖</span><span class="title-sub">中筮法</span></h1>
+      <p class="subtitle">あなたの今と未来を占う</p>
     </div>
     <div class="auth-area">
       <div id="auth-user" class="auth-user" style="display:none;"></div>
@@ -29,14 +29,21 @@
     </div>
   </header>
 
-  <!-- 卦辞・爻辞データ読み込み表示 -->
-  <div id="data-status" class="data-status"></div>
-
   <!-- メインエリア -->
   <main>
 
-    <!-- ① 説明 -->
-    <section class="section" id="intro">
+    <!-- ① 説明（一般モード：簡潔・折りたたみ） -->
+    <section class="section" id="intro-simple">
+      <h2 class="collapsible-head" id="intro-simple-head">占い方 <span class="fold-icon-sm" id="intro-fold-icon">▾</span></h2>
+      <div id="intro-simple-body">
+        <p>占いたい事柄を記載した後、心を無にし「硬貨を投げる」ボタンを繰り返し6回押してください。<br>
+        システムが下（初爻）から上（上爻）に向かって卦を組み立てます。</p>
+        <p class="intro-note">※ 気軽に占いたい方は「一気に占う」ボタンで6回分を一度に行えます。</p>
+      </div>
+    </section>
+
+    <!-- ①b 説明（学術モード：詳細） -->
+    <section class="section" id="intro-academic" style="display:none;">
       <h2>占い方</h2>
       <p>硬貨を3枚用意して、「投げる」ボタンを押してください。<br>
       表（おもて）を<b>3</b>、裏（うら）を<b>2</b>として、合計値を求めます。<br>
@@ -75,14 +82,15 @@
       </div>
 
       <!-- 操作ボタン -->
-      <div class="controls">
+      <div class="controls" id="controls">
         <button id="btn-toss" class="btn btn-primary">硬貨を投げる</button>
-        <button id="btn-skip" class="btn btn-secondary" style="display:none;">自動で占う（一括）</button>
+        <button id="btn-skip" class="btn btn-secondary" style="display:none;">一気に占う</button>
         <button id="btn-reset" class="btn btn-reset" style="display:none;">やり直す</button>
       </div>
+      <p class="ceremony-note" id="ceremony-note" style="display:none;">🎋 初回は6回コインを投げて占う「儀式」を体験できます。<br>心を静めて、ひとつずつ投げてみましょう。</p>
 
       <!-- 進捗 -->
-      <div class="progress" id="progress">
+      <div class="progress" id="progress" style="display:none;">
         <div class="progress-label">初爻 ‥ 上爻</div>
         <div class="yao-slots" id="yao-slots">
           <div class="yao-slot" id="slot0" data-idx="0">初爻</div>
@@ -95,14 +103,64 @@
       </div>
     </section>
 
-    <!-- ③ 結果エリア -->
+    <!-- ③ 結果エリア（一般モード：卦ビジュアル中心） -->
+    <section class="section" id="result-area-simple" style="display:none;">
+      <h2>あなたの卦</h2>
+      <div class="result" id="result-simple"></div>
+    </section>
+
+    <!-- ③b 結果エリア（学術モード：現行の詳細表示） -->
     <section class="section" id="result-area" style="display:none;">
       <h2>立卦結果</h2>
       <div class="result" id="result"></div>
     </section>
 
-    <!-- ③b テスト表示（任意の卦を確認） -->
-    <section class="section" id="test-area">
+    <!-- ④ お告げ（一般モード：現代語訳を大きく） -->
+    <section class="section" id="yaoji-area-simple" style="display:none;">
+      <h2>あなたへのお告げ</h2>
+      <div class="yaoji" id="yaoji-simple"></div>
+    </section>
+
+    <!-- ④b 爻辞表示（学術モード） -->
+    <section class="section" id="yaoji-area" style="display:none;">
+      <h2>読むべき爻辞</h2>
+      <div class="yaoji" id="yaoji"></div>
+    </section>
+
+    <!-- ⑤ 式神による詳細鑑定 -->
+    <section class="section" id="ai-area" style="display:none;">
+      <h2>式神による詳細鑑定 <span class="badge">β</span></h2>
+      <p class="ai-intro">
+        易の言葉は深遠であり、天が告げる真意を一般の人が自らの状況に照らし合わせて読み解くのは、容易ではありません。<br>
+        陰陽師・四雲が使役する『式神』が、難解な古文書の言葉や複数の卦の絡み合いを、現代のあなたの悩みに合わせて翻訳します。<br>
+        ただ吉凶を占うだけでなく、どう行動すべきか「運命をひらく心法」をお伝えします。
+      </p>
+      <div class="ai-setting">
+        <button id="btn-ai" class="btn btn-ai">式神の託宣を受ける</button>
+        <p class="ai-login-note">※ 初回の託宣は無料です。ログインすると占い結果と合わせて履歴に保存されます。</p>
+      </div>
+      <div id="ai-credit" class="ai-credit"></div>
+      <div class="ai-output" id="ai-output">
+        <p class="hint">🎴 占いが完了すると、ここに式神の託宣が表示されます。</p>
+      </div>
+    </section>
+
+    <!-- ⑥ 占い履歴 -->
+    <section class="section" id="history-area">
+      <h2>占い履歴</h2>
+      <p class="history-note">占った内容は自動的に保存されます。過去の卦とお告げを振り返れます。</p>
+      <div id="history-count" class="history-count"></div>
+      <div class="history-controls">
+        <button id="btn-history" class="btn btn-secondary">履歴を読み込む</button>
+        <button id="btn-export" class="btn btn-secondary">CSVで書き出す</button>
+        <button id="btn-export-json" class="btn btn-secondary">JSONでバックアップ</button>
+        <button id="btn-clear-all" class="btn btn-reset">全削除</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </section>
+
+    <!-- ⑦ テスト表示（?test=1 時のみ表示） -->
+    <section class="section" id="test-area" style="display:none;">
       <h2>テスト表示 <span class="badge">確認用</span></h2>
       <p class="test-note">硬貨を投げずに、任意の卦・爻の「天の声」を確認できます。</p>
       <div class="test-controls">
@@ -114,51 +172,15 @@
       <div id="test-result" class="test-result"></div>
     </section>
 
-    <!-- ③c 占い履歴 -->
-    <section class="section" id="history-area">
-      <h2>占い履歴</h2>
-      <p class="history-note">占った内容は「この端末」に自動保存されます（最大50件）。占い結果とAI解釈を記録できます。</p>
-      <div id="history-count" class="history-count"></div>
-      <div class="history-controls">
-        <button id="btn-history" class="btn btn-secondary">履歴を読み込む</button>
-        <button id="btn-export" class="btn btn-secondary">CSVで書き出す</button>
-        <button id="btn-export-json" class="btn btn-secondary">JSONでバックアップ</button>
-        <button id="btn-clear-all" class="btn btn-reset">全削除</button>
-      </div>
-      <div id="history-list" class="history-list"></div>
-    </section>
-
-    <!-- ④ 爻辞表示 -->
-    <section class="section" id="yaoji-area" style="display:none;">
-      <h2>読むべき爻辞</h2>
-      <div class="yaoji" id="yaoji"></div>
-    </section>
-
-    <!-- ⑤ AI解釈（四雲先生の統合解釈） -->
-    <section class="section" id="ai-area" style="display:none;">
-      <h2>AI 統合解釈 <span class="badge">β</span></h2>
-      <div class="ai-setting">
-        <label>AIプロバイダ</label>
-        <select id="ai-provider">
-          <option value="deepseek">DeepSeek（低コスト）</option>
-          <option value="openai">OpenAI</option>
-        </select>
-        <label>
-          API キー
-          <input type="password" id="api-key" placeholder="API Key を入力">
-        </label>
-        <button id="btn-ai" class="btn btn-ai">解釈する</button>
-      </div>
-      <div id="ai-credit" class="ai-credit"></div>
-      <div class="ai-output" id="ai-output">
-        <p class="hint">🎴 占いが完了すると、ここに四雲先生の統合解釈が表示されます。</p>
-      </div>
-    </section>
-
   </main>
 
+  <!-- フッター -->
   <footer class="footer">
-    <p>© 2026 易占 by 陰陽師の友</p>
+    <div class="mode-switch" id="mode-switch">
+      <span id="mode-switch-label"></span>
+      <button id="btn-mode-toggle" class="btn btn-mode">モードを切り替える</button>
+    </div>
+    <p>© 2026 易聖 by 陰陽師・四雲</p>
   </footer>
 </div>
 
@@ -174,13 +196,13 @@
 <script src="js/supabase.js"></script>
 <script src="js/app.js"></script>
 <script>
-  // Service Worker 登録（PWA）
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
-    });
-  }
+  // Service Worker 登録（PWA）※ 開発中は無効化（古いキャッシュで新しいコードが反映されないのを防ぐ）
+  // 本番公開時はコメントを外してください
+  // if ("serviceWorker" in navigator) {
+  //   window.addEventListener("load", () => {
+  //     navigator.serviceWorker.register("./sw.js").catch(() => {});
+  //   });
+  // }
 </script>
 </body>
 </html>
-</｜｜DSML｜｜tool>

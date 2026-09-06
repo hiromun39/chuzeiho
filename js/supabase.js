@@ -24,6 +24,13 @@
     get client() { return supabase; },
     get user() { return currentUser; },
 
+    // アクセストークン取得（Worker 呼び出し用）
+    async getAccessToken() {
+      if (!supabase) return null;
+      const { data } = await supabase.auth.getSession();
+      return data.session?.access_token || null;
+    },
+
     // ログイン状態監視
     init(callback) {
       if (!supabase) {
@@ -59,7 +66,7 @@
 
     // ---------- 履歴DB操作 ----------
 
-    // DBから全履歴を取得し、localStorage に反映
+    // DBから全履歴を取得し、localStorage の未同期データとマージして反映
     async fetchHistoryFromDB() {
       if (!supabase || !currentUser) return null;
       try {
@@ -71,30 +78,78 @@
           console.error("履歴取得エラー:", error.message);
           return null;
         }
-        // DBの形式をアプリ形式に変換して localStorage に反映
-        const records = (data || []).map(rowToRecord);
+        // DBの形式をアプリ形式に変換
+        const dbRecords = (data || []).map(rowToRecord);
+
+        // localStorage の既存履歴を取得
+        let localRecords = [];
         try {
-          localStorage.setItem("eki-sen-history", JSON.stringify(records));
+          localRecords = JSON.parse(localStorage.getItem("eki-sen-history") || "[]");
         } catch (e) {}
-        console.log(`DB → localStorage 反映完了: ${records.length}件`);
-        return records;
+
+        // ts キーでマージ（DB優先・localStorage の未同期分も保持・ts は正規化）
+        const dbMap = new Map();
+        dbRecords.forEach(r => dbMap.set(r.ts, r));
+        localRecords.forEach(r => {
+          const normTs = normalizeTs(r.ts);
+          r.ts = normTs;
+          if (!dbMap.has(normTs)) dbMap.set(normTs, r);
+        });
+        const merged = [...dbMap.values()].sort((a, b) =>
+          new Date(a.ts) - new Date(b.ts)
+        );
+
+        // マージ結果を localStorage に反映（未同期のローカルデータを保持）
+        try {
+          localStorage.setItem("eki-sen-history", JSON.stringify(merged));
+        } catch (e) {}
+
+        console.log(`DB → localStorage 反映完了: ${merged.length}件（DB:${dbRecords.length} / ローカル保持:${localRecords.length} / マージ後:${merged.length}）`);
+        return merged;
       } catch (e) {
         console.error("DB履歴取得エラー:", e);
         return null;
       }
     },
 
-    // 履歴をDBに保存
+    // 履歴をDBに保存（同じ ts が既に存在する場合はスキップ）
     async saveHistory(record) {
       if (!supabase || !currentUser) return false;
-      const { error } = await supabase
-        .from("history")
-        .insert([recordToRow(record)]);
-      if (error) {
-        console.error("履歴保存エラー:", error.message);
+      try {
+        const tsNormalized = normalizeTs(record.ts);
+        // 重複チェック：同じ ts が既にDBにあるか確認
+        const { data, error: checkError } = await supabase
+          .from("history")
+          .select("ts")
+          .eq("ts", tsNormalized)
+          .limit(1);
+        if (checkError) {
+          // チェック失敗時は insert を試みる（エラー時は後続で処理）
+          console.error("重複チェックエラー:", checkError.message);
+        } else if (data && data.length > 0) {
+          // 既に存在する場合はスキップ
+          console.log(`既存の履歴のためスキップ: ${tsNormalized}`);
+          return true;
+        }
+
+        // ts を正規化して保存
+        const { error } = await supabase
+          .from("history")
+          .insert([recordToRow(Object.assign({}, record, { ts: tsNormalized }))]);
+        if (error) {
+          // ユニーク制約違反など既に存在する場合は無視
+          if (error.code === "23505") {
+            console.log(`重複のためスキップ: ${tsNormalized}`);
+            return true;
+          }
+          console.error("履歴保存エラー:", error.message);
+          return false;
+        }
+        return true;
+      } catch (e) {
+        console.error("履歴保存エラー:", e);
         return false;
       }
-      return true;
     },
 
     // 履歴をDBで更新（AI解釈追記など）
@@ -119,15 +174,16 @@
     async syncLocalToDB() {
       if (!supabase || !currentUser) return;
       try {
-        // DBから最新の履歴を取得（重複判断のため）
+        // DBから最新の履歴を取得（重複判断のため・ts を正規化）
         const { data } = await supabase
           .from("history")
           .select("ts")
           .order("ts", { ascending: true });
-        const existingTs = new Set((data || []).map(r => r.ts));
+        const existingTs = new Set((data || []).map(r => normalizeTs(r.ts)));
 
+        // ローカルの ts も正規化して比較
         const localHistory = JSON.parse(localStorage.getItem("eki-sen-history") || "[]");
-        const toUpload = localHistory.filter(h => !existingTs.has(h.ts));
+        const toUpload = localHistory.filter(h => !existingTs.has(normalizeTs(h.ts)));
 
         for (const record of toUpload) {
           await AppSupabase.saveHistory(record);
@@ -139,10 +195,24 @@
     }
   };
 
+  // タイムスタンプを標準形式（ISO 8601・UTC・ミリ秒）に正規化
+  // - localStorage: "2026-08-09T08:41:45.365Z"  (文字列)
+  // - Supabase DB:  "2026-08-09T08:41:45.365+00" (timestamp with time zone)
+  // これらを比較・保存時に統一する
+  function normalizeTs(ts) {
+    if (!ts) return new Date().toISOString();
+    try {
+      const d = new Date(ts);
+      return isNaN(d.getTime()) ? String(ts) : d.toISOString();
+    } catch (e) {
+      return String(ts);
+    }
+  }
+
   // 行→アプリ形式変換
   function rowToRecord(row) {
     return {
-      ts: row.ts || new Date().toISOString(),
+      ts: normalizeTs(row.ts),
       fortune: row.fortune || "",
       honkaku: row.honkaku || null,
       shikaku: row.shikaku || null,

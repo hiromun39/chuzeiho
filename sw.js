@@ -4,7 +4,7 @@
    - アプリ更新時のキャッシュ更新
    ========================================= */
 
-const CACHE_NAME = "chuzeiho-v1";
+const CACHE_NAME = "chuzeiho-v2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -42,28 +42,25 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// フェッチ
+// フェッチ（開発中はネットワーク優先、オフライン時のみキャッシュ）
 self.addEventListener("fetch", (event) => {
   // クロスオリジン（API等）はスコープ外
   if (!event.request.url.startsWith(self.location.origin)) return;
 
   event.respondWith(
-    caches.match(event.request)
-      .then((cached) => {
-        // キャッシュがあれば即返す
-        if (cached) return cached;
-
-        // なければネットワーク取得 → キャッシュに保存
-        return fetch(event.request)
-          .then((response) => {
-            if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-            }
-            return response;
-          })
-          .catch(() => {
-            // ネットワーク失敗時は index.html（SPA 的に）
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => {
+        // ネットワーク失敗時にキャッシュを探す
+        return caches.match(event.request)
+          .then((cached) => {
+            if (cached) return cached;
             if (event.request.mode === "navigate") {
               return caches.match("./index.html");
             }
