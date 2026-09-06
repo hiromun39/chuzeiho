@@ -196,13 +196,12 @@
 <script src="js/supabase.js"></script>
 <script src="js/app.js"></script>
 <script>
-  // Service Worker 登録（PWA）※ 開発中は無効化（古いキャッシュで新しいコードが反映されないのを防ぐ）
-  // 本番公開時はコメントを外してください
-  // if ("serviceWorker" in navigator) {
-  //   window.addEventListener("load", () => {
-  //     navigator.serviceWorker.register("./sw.js").catch(() => {});
-  //   });
-  // }
+  // Service Worker 登録（PWA・オフライン対応）
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    });
+  }
 </script>
 </body>
 </html>
