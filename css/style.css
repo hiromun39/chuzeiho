@@ -1,3 +1,13 @@
+/* ============ 法務ページ（プライバシー・規約） ============ */
+.legal-page { max-width: 860px; margin: 0 auto; padding: 40px 20px 60px; }
+.legal-page h1 { text-align: center; color: var(--sumi); font-size: 1.8em; margin-bottom: 8px; }
+.legal-page .updated { text-align: center; color: var(--text-sub); font-size: 0.85em; margin-bottom: 32px; }
+.legal-page h2 { color: var(--shu); font-size: 1.2em; margin-top: 32px; margin-bottom: 12px; border-left: 4px solid var(--shu); padding-left: 12px; }
+.legal-page p, .legal-page li { color: var(--text); font-size: 0.95em; line-height: 1.9; }
+.legal-page ul { padding-left: 24px; margin: 8px 0; }
+.legal-page a { color: var(--shu); }
+.legal-page .back-link { display: block; text-align: center; margin-top: 48px; }
+
 /* =========================================
    中筮法 - 和風スタイル
    墨・朱・金を基調とした落ち着いたデザイン
@@ -850,6 +860,19 @@ body {
   margin-top: 40px;
   padding-top: 20px;
   border-top: 1px solid var(--washi-dark);
+}
+
+.footer-links {
+  margin-bottom: 8px;
+}
+
+.footer-links a {
+  color: var(--shu);
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  text-decoration: underline;
 }
 
 /* ---------- 一般モード：説明の折りたたみ ---------- */
