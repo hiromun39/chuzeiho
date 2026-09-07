@@ -1430,6 +1430,15 @@
       try { initTestArea(); } catch (e) { console.error("initTestArea:", e); }
       try { initHistoryArea(); } catch (e) { console.error("initHistoryArea:", e); }
       try { initAIArea(); } catch (e) { console.error("initAIArea:", e); }
+
+      // 決済からの復帰（?paid=1）処理：Squareから戻った直後に最新のプラン状態を再取得して表示する
+      if (params.get("paid") === "1") {
+        // セッション・ログインが確立するのを待ってから、残チケット表示を更新する
+        setTimeout(() => {
+          updateAICreditDisplay();
+          console.log("決済から復帰: 残チケット等を再取得しました");
+        }, 2500);
+      }
     } catch (e) {
       console.error("初期化エラー:", e);
     }
