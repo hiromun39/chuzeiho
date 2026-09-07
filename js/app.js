@@ -639,6 +639,8 @@
       };
       saveHistory(lastResult);
       aiArea.style.display = "block";
+      // 画面状態をストレージに保存（決済・ログイン画面への遷移からの復帰用）
+      saveDivinationState();
       return;
     }
 
@@ -723,6 +725,71 @@
 
     // AIエリア表示
     aiArea.style.display = "block";
+
+    // 画面状態をストレージに保存（決済・ログイン画面への遷移からの復帰用）
+    saveDivinationState();
+  }
+
+  // ---------- 画面状態の保存・復元（決済/ログイン遷移からの復帰用） ----------
+  const DIV_STATE_KEY = "eki-sen-current-state";
+
+  // 現在の占い状態（結果表示に必要な min 値）をセッションストレージへ保存
+  function saveDivinationState() {
+    try {
+      if (!values || values.length !== 6) return; // 占い未完了時は保存しない
+      const fortune = getFortuneText();
+      const state = {
+        values: [...values],
+        fortune: fortune,
+        savedAt: new Date().toISOString(),
+        // uiMode:: "simple" | "academic" でなく現在の表示モード。復元時は常に現在モードで再現
+      };
+      sessionStorage.setItem(DIV_STATE_KEY, JSON.stringify(state));
+      console.log("占い状態を保存しました");
+    } catch (e) {
+      console.error("状態保存エラー:", e.message);
+    }
+  }
+
+  // 保存された占い状態があれば、占い結果画面を再構築する
+  function restoreDivinationState() {
+    try {
+      const raw = sessionStorage.getItem(DIV_STATE_KEY);
+      if (!raw) return false;
+      const state = JSON.parse(raw);
+      if (!state.values || state.values.length !== 6) return false;
+
+      // 復元対象の爻値をセット
+      values = state.values;
+      tossCount = 6;
+
+      // 占いテキストを復元
+      if (fortuneText && state.fortune) {
+        fortuneText.value = state.fortune;
+        try { updateCount(); } catch (e) {}
+      }
+
+      // 結果画面を再構築（showResult が内部で calc → HTML表示 → 履歴保存も行う）
+      aiArea.style.display = "block"; // 結果表示の準備（showResult 内でも制御される）
+      showResult();
+
+      // 復元したらクリアして再発行を防ぐ
+      // ※ ただし、?paid=1 等で何度もリロードされても復元できるよう、処理後も保持しておく。
+      //   リセット（新しい占い）時にクリアする。
+
+      // 結果エリアへ自動スクロール
+      setTimeout(() => {
+        if (resultAreaSimple && resultAreaSimple.style.display === "block") {
+          resultAreaSimple.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 300);
+
+      console.log("占い状態を復元しました");
+      return true;
+    } catch (e) {
+      console.error("状態復元エラー:", e.message);
+      return false;
+    }
   }
 
   // ---------- 課金・プラン状態の表示管理（Square Checkout 導線） ----------
@@ -1437,7 +1504,15 @@
         setTimeout(() => {
           updateAICreditDisplay();
           console.log("決済から復帰: 残チケット等を再取得しました");
+          // ?paid=1 から復帰する直前に保存しておいた占い状態を復元
+          restoreDivinationState();
         }, 2500);
+      } else {
+        // 通常のページアクセス時も、遷移前に保存した占い状態を復元（ログイン後リダイレクト等で初期画面に帰ってきた場合）
+        // ※ 初期化の reset() 直後に行うため、少し遅延させて描画の順序を整える
+        setTimeout(() => {
+          restoreDivinationState();
+        }, 300);
       }
     } catch (e) {
       console.error("初期化エラー:", e);
