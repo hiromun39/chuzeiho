@@ -966,7 +966,10 @@
       aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       if (err.code === "PAYMENT_REQUIRED") {
-        aiOutput.innerHTML = `<p class="ai-error">⚠️ ${err.message}</p><p class="hint">2回目以降の利用は有料プラン（近日実装予定）になります。よろしければ四雲先生の本鑑定をご検討ください。</p>`;
+        aiOutput.innerHTML = `<p class="ai-error">⚠️ ${err.message}</p>`;
+        // 402 = チケット・サブスクが無く利用できない。購入導線（課金UI）を表示する
+        updateAICreditDisplay();
+        aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
       } else if (err.code === "NOT_AUTHENTICATED") {
         aiOutput.innerHTML = `<p class="ai-error">🔐 ${err.message}</p><p class="hint">無料ログイン（Google連携）で、初回の式神の託宣を無料でお試しいただけます。占い結果も自動で履歴に保存されます。</p>`;
       } else {
@@ -1315,6 +1318,8 @@
             isSyncing = false;
           }
           showHistory();
+          // ログイン状態が確定したので、課金UI（購入導線）の表示を更新する
+          updateAICreditDisplay();
         } else {
           // 未ログイン
           btnLogin.style.display = "inline-block";
