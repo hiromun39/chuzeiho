@@ -725,16 +725,134 @@
     aiArea.style.display = "block";
   }
 
-  // ---------- 無料回数管理（DBで管理するため、表示は固定案内のみ） ----------
-  function updateAICreditDisplay() {
+  // ---------- 課金・プラン状態の表示管理（Square Checkout 導線） ----------
+
+  // 課金エリア全体の表示を更新。ログイン状態・プラン状態に応じて出し分ける。
+  async function updateAICreditDisplay() {
     const el = $("ai-credit");
+    const billingArea = $("billing-area");
     if (!el) return;
     const loggedIn = !!(window.AppSupabase && window.AppSupabase.user);
-    if (loggedIn) {
-      // ログイン済み：導線はボタンに委ね、余計な告知は控える
-      el.innerHTML = ``;
-    } else {
+    if (!loggedIn) {
+      // 未ログイン：購入導線は出さない（ログイン案内のみ）
       el.innerHTML = `<span class="ai-credit-free">※ 式神の託宣にはログインが必要です。</span>`;
+      if (billingArea) billingArea.style.display = "none";
+      return;
+    }
+
+    el.innerHTML = ``;
+
+    // プラン状態を取得（初回無料・チケット・サブスク）
+    let plans = null;
+    try {
+      plans = await window.AppSupabase.getPlans();
+    } catch (e) {
+      // /api/plans が失敗しても致命的でない。静かに購入導線だけ隠す
+      console.error("プラン取得エラー:", e.message);
+      if (billingArea) billingArea.style.display = "none";
+      return;
+    }
+
+    const hasFree = !!plans.freeAvailable;
+    const credits = plans.oneTimeCredits || 0;
+    const sub = plans.subscription || { active: false, status: "none" };
+    const subActive = !!sub.active;
+
+    // 無料枠が残っていて・チケットも無し・サブスクも無し → 買い物エリアは出さない
+    // （初回ユーザーには課金を押し付けない。402 が出た時点で表示する）
+    const shouldShowBilling = !(hasFree && credits === 0 && !subActive);
+
+    if (billingArea) {
+      billingArea.style.display = shouldShowBilling ? "block" : "none";
+    }
+
+    // プラン状態の詳細表示（残チケット・サブスク・解約ボタン）
+    updateBillingStatus({ plans, hasFree, credits, sub, subActive });
+  }
+
+  // 「現在のプラン状態」エリアの描画
+  function updateBillingStatus({ plans, hasFree, credits, sub, subActive }) {
+    const statusEl = $("billing-status");
+    const btnSingle = $("btn-buy-single");
+    const btnMonthly = $("btn-buy-monthly");
+    if (!statusEl) return;
+
+    let html = "";
+    if (subActive) {
+      // サブスク有効
+      html += `<div class="billing-badge active">✅ 月額プラン有効中（無制限）</div>`;
+      if (sub.currentPeriodEnd) {
+        const d = new Date(sub.currentPeriodEnd);
+        html += `<p class="billing-period">有効期限: ${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}</p>`;
+      }
+    } else {
+      if (hasFree) {
+        html += `<div class="billing-badge free">🎴 初回の託宣は無料（未使用）</div>`;
+      }
+      if (credits > 0) {
+        html += `<div class="billing-badge credit">🎫 残チケット: ${credits} 枚</div>`;
+      }
+      if (sub.status && sub.status !== "none") {
+        html += `<div class="billing-badge">💳 サブスク状態: ${sub.status}</div>`;
+      }
+    }
+
+    // サブスク有効時は購入ボタンを無効化し、解約ボタンを出す
+    if (subActive) {
+      if (btnSingle) { btnSingle.disabled = true; btnSingle.textContent = "サブスク利用中"; }
+      if (btnMonthly) { btnMonthly.disabled = true; btnMonthly.textContent = "登録済み"; }
+      // 解約ボタン（動的）
+      html += `<button id="btn-cancel-sub" class="btn btn-cancel">サブスクを解約する</button>`;
+    } else {
+      if (btnSingle) { btnSingle.disabled = false; btnSingle.textContent = "500円で購入"; }
+      if (btnMonthly) { btnMonthly.disabled = false; btnMonthly.textContent = "月額2,980円に登録"; }
+    }
+
+    statusEl.innerHTML = html;
+
+    // 解約ボタンにイベント登録
+    const cancelBtn = $("btn-cancel-sub");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", onCancelSubscription);
+    }
+  }
+
+  // 単発購入（Square Checkout URL へリダイレクト）
+  async function onBuySingle() {
+    try {
+      btnAi.disabled = true;
+      const url = await window.AppSupabase.createCheckout("single_500");
+      aiOutput.innerHTML = `<p class="hint">Square の決済画面へ移動しています…</p>`;
+      window.location.href = url;
+    } catch (e) {
+      aiOutput.innerHTML = `<p class="ai-error">⚠️ ${e.message}</p>`;
+      btnAi.disabled = false;
+    }
+  }
+
+  // 月額サブスク登録（Square Checkout URL へリダイレクト）
+  async function onBuyMonthly() {
+    try {
+      btnAi.disabled = true;
+      const url = await window.AppSupabase.createCheckout("monthly_2980");
+      aiOutput.innerHTML = `<p class="hint">Square の決済画面へ移動しています…</p>`;
+      window.location.href = url;
+    } catch (e) {
+      aiOutput.innerHTML = `<p class="ai-error">⚠️ ${e.message}</p>`;
+      btnAi.disabled = false;
+    }
+  }
+
+  // サブスク解約
+  async function onCancelSubscription() {
+    if (!confirm("サブスクを解約しますか？期間満了日までご利用いただけます。")) return;
+    try {
+      const result = await window.AppSupabase.cancelSubscription();
+      aiOutput.innerHTML = `<p class="hint">✅ ${result.message || "解約を予約しました。"}</p>`;
+      // 状態を再取得
+      updateAICreditDisplay();
+    } catch (e) {
+      aiOutput.innerHTML = `<p class="ai-error">⚠️ ${e.message}</p>`;
     }
   }
 
@@ -1319,6 +1437,11 @@
       fortuneText.addEventListener("input", updateCount);
       try { updateCount(); } catch (e) {}
     }
+    // 課金ボタン登録（購入・解約）
+    const btnBuySingle = $("btn-buy-single");
+    const btnBuyMonthly = $("btn-buy-monthly");
+    if (btnBuySingle) { try { btnBuySingle.addEventListener("click", onBuySingle); } catch (e) {} }
+    if (btnBuyMonthly) { try { btnBuyMonthly.addEventListener("click", onBuyMonthly); } catch (e) {} }
   });
 
 })();

@@ -140,6 +140,34 @@
         <p class="ai-login-note">※ 初回の託宣は無料です。ログインすると占い結果と合わせて履歴に保存されます。</p>
       </div>
       <div id="ai-credit" class="ai-credit"></div>
+
+      <!-- 課金プラン（Square Checkout 誘導） -->
+      <div id="billing-area" class="billing-area" style="display:none;">
+        <h3 class="billing-title">📿 さらに深い鑑定を求める方へ</h3>
+        <p class="billing-note">初回無料の託宣を使い切った方、何度でも鑑定したい方はプランをご購入ください。<br>
+        お支払いは Square の安全な決済画面で行います（カード情報がサイトに残ることはありません）。</p>
+
+        <!-- 現在のプラン状態 -->
+        <div id="billing-status" class="billing-status"></div>
+
+        <div class="billing-plans">
+          <!-- 単発チケット -->
+          <div class="plan-card">
+            <div class="plan-name">単発チケット</div>
+            <div class="plan-price">¥500 <span class="plan-unit">/ 1回</span></div>
+            <p class="plan-desc">1回の鑑定に使えるチケット1枚。購入は1回ごと。</p>
+            <button id="btn-buy-single" class="btn btn-buy">500円で購入</button>
+          </div>
+          <!-- 月額サブスク -->
+          <div class="plan-card plan-card-recommend">
+            <div class="plan-name">月額プラン <span class="badge">おすすめ</span></div>
+            <div class="plan-price">¥2,980 <span class="plan-unit">/ 月</span></div>
+            <p class="plan-desc">有効中の間、式神の託宣が<span class="text-strong">無制限</span>でご利用いただけます。</p>
+            <button id="btn-buy-monthly" class="btn btn-buy">月額2,980円に登録</button>
+          </div>
+        </div>
+      </div>
+
       <div class="ai-output" id="ai-output">
         <p class="hint">🎴 占いが完了すると、ここに式神の託宣が表示されます。</p>
       </div>

@@ -64,6 +64,68 @@
       await supabase.auth.signOut();
     },
 
+    // ---------- 課金API操作（Worker経由） ----------
+
+    // プロキシURL（Worker）
+    _workerBase() {
+      return "https://eki-sen-ai-proxy.hiromun39.workers.dev";
+    },
+
+    // Worker へ JWT 付きで GET/POST する内部ヘルパー
+    async _apiFetch(path, { method = "GET", body } = {}) {
+      if (!supabase || !currentUser) {
+        const err = new Error("ログインが必要です。");
+        err.code = "NOT_AUTHENTICATED";
+        throw err;
+      }
+      const accessToken = await this.getAccessToken();
+      if (!accessToken) {
+        const err = new Error("ログインセッションを取得できませんでした。再ログインしてください。");
+        err.code = "NOT_AUTHENTICATED";
+        throw err;
+      }
+      const res = await fetch(this._workerBase() + path, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.error || `エラー (${res.status})`);
+        if (data.code) err.code = data.code;
+        throw err;
+      }
+      return data;
+    },
+
+    // 現在のプラン状態を取得（/api/plans）
+    async getPlans() {
+      const data = await this._apiFetch("/api/plans", { method: "GET" });
+      return data;
+    },
+
+    // チェックアウトURLを取得（plan: "single_500" | "monthly_2980"）
+    // 成功時 { checkoutUrl } を返す
+    async createCheckout(plan) {
+      const path = plan === "single_500"
+        ? "/api/checkout/single"
+        : "/api/checkout/subscription";
+      const data = await this._apiFetch(path, { method: "POST" });
+      if (!data.checkoutUrl) {
+        throw new Error("決済URLを取得できませんでした。");
+      }
+      return data.checkoutUrl;
+    },
+
+    // サブスク解約（/api/subscription/cancel）
+    async cancelSubscription() {
+      const data = await this._apiFetch("/api/subscription/cancel", { method: "POST" });
+      return data; // { success, message }
+    },
+
     // ---------- 履歴DB操作 ----------
 
     // DBから全履歴を取得し、localStorage の未同期データとマージして反映
