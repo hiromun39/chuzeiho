@@ -1604,15 +1604,32 @@
         setTimeout(async () => {
           // ① 占い結果＋式神解釈の状態を復元
           const restored = restoreDivinationState();
-          // ② 復元したら保存状態を消費（sessionStorage から破棄）して、固着・再発を防ぐ
+          // ② 復元したら保存状態を消費（両ストレージから破棄）して、固着・再発を防ぐ
           try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
-          // ③ 最新のプラン状態（残チケット）を再取得して表示更新
-          try {
-            await updateAICreditDisplay();
-            console.log("決済から復帰: 占い状態復元=" + restored + " / 残チケット等を再取得しました");
-          } catch (e) {
-            console.error("決済復帰: チケット表示更新エラー:", e);
-          }
+          try { localStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+
+          // ③ 最新のプラン状態（残チケット）を反映する。
+          //    Square の Webhook による credit 付与にはタイムラグがあるため、
+          //    1.2秒間隔で数回リトライし、増加後の最新値を確実に画面へ反映させる。
+          let attempts = 0;
+          const maxAttempts = 6;
+          const tryFetch = async () => {
+            try {
+              await updateAICreditDisplay();
+              attempts++;
+              if (attempts < maxAttempts) {
+                // まだ反映が不安定なら再試行（最後まで待って確実にする）
+                setTimeout(tryFetch, 1200);
+              } else {
+                console.log("決済から復帰: 占い状態復元=" + restored + " / 残チケット等を再取得しました");
+              }
+            } catch (e) {
+              console.error("決済復帰: チケット表示更新エラー:", e);
+              attempts++;
+              if (attempts < maxAttempts) setTimeout(tryFetch, 1200);
+            }
+          };
+          tryFetch();
         }, 2500);
       } else {
         // 通常アクセス（F5・新タブ・直接URL）＝初期画面を表示。
