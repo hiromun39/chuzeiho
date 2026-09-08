@@ -825,12 +825,11 @@
     const sub = plans.subscription || { active: false, status: "none" };
     const subActive = !!sub.active;
 
-    // 無料枠が残っていて・チケットも無し・サブスクも無し → 買い物エリアは出さない
-    // （初回ユーザーには課金を押し付けない。402 が出た時点で表示する）
-    const shouldShowBilling = !(hasFree && credits === 0 && !subActive);
-
+    // 課金UIは独立セクション（billing-section）なので、ログイン済みなら常に表示する。
+    // 中身（残チケット・サブスク状態）は updateBillingStatus が詳細に出す。
+    // これにより、決済後に「残チケット:1枚」を確実にユーザーへ見せられる。
     if (billingArea) {
-      billingArea.style.display = shouldShowBilling ? "block" : "none";
+      billingArea.style.display = "block";
     }
 
     // プラン状態の詳細表示（残チケット・サブスク・解約ボタン）

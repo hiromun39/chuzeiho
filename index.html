@@ -142,10 +142,17 @@
       <div id="ai-credit" class="ai-credit"></div>
 
       <!-- 課金プラン（Square Checkout 誘導） -->
+      <div class="ai-output" id="ai-output">
+        <p class="hint">🎴 占いが完了すると、ここに式神の託宣が表示されます。</p>
+      </div>
+    </section>
+
+    <!-- ⑤b 課金・プラン（独立セクション：ログイン中は初期画面でも常に表示） -->
+    <section class="section" id="billing-section">
+      <h2>プラン・残チケット</h2>
       <div id="billing-area" class="billing-area" style="display:none;">
         <h3 class="billing-title">📿 さらに深い鑑定を求める方へ</h3>
-        <p class="billing-note">初回無料の託宣を使い切った方、何度でも鑑定したい方はプランをご購入ください。<br>
-        お支払いは Square の安全な決済画面で行います（カード情報がサイトに残ることはありません）。</p>
+        <p class="billing-note">お支払いは Square の安全な決済画面で行います（カード情報がサイトに残ることはありません）。</p>
 
         <!-- 現在のプラン状態 -->
         <div id="billing-status" class="billing-status"></div>
@@ -166,10 +173,6 @@
             <button id="btn-buy-monthly" class="btn btn-buy">月額2,980円に登録</button>
           </div>
         </div>
-      </div>
-
-      <div class="ai-output" id="ai-output">
-        <p class="hint">🎴 占いが完了すると、ここに式神の託宣が表示されます。</p>
       </div>
     </section>
 
