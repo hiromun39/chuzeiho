@@ -730,10 +730,19 @@
     saveDivinationState();
   }
 
-  // ---------- 画面状態の保存・復元（決済/ログイン遷移からの復帰用） ----------
+  // ---------- 画面状態の保存・復元（決済/ログイン/外部タブ遷移からの復帰用） ----------
+  // ※ 式神解釈（aiText）まで含めて完全復元するため、localStorage に保存する。
+  //   sessionStorage は同一タブ・同一セッション限定で、Square の外部タブ遷移（Testing Panel 等）では
+  //   消失するため、localStorage を主記憶として使う（ページ再読込・別タブ復帰でも維持される）。
   const DIV_STATE_KEY = "eki-sen-current-state";
 
-  // 現在の占い状態（結果表示に必要な min 値）をセッションストレージへ保存
+  // 直近の式神解釈テキスト（保存・復元用の変数）
+  let lastAIText = null;
+
+  // 現在の占い状態（占い結果 ＋ 式神解釈を含む完全スナップショット）を localStorage へ保存
+  // - values / fortune: 占い結果画面を再構築するため
+  // - aiText: 式神解釈（あれば）を再表示するため
+  // - hasShikigami: 式神解釈が表示済みか（true なら結果表示の後に託宣も表示）
   function saveDivinationState() {
     try {
       if (!values || values.length !== 6) return; // 占い未完了時は保存しない
@@ -741,25 +750,35 @@
       const state = {
         values: [...values],
         fortune: fortune,
+        aiText: lastAIText || null,      // 式神解釈の原文（あれば）
+        hasShikigami: !!(aiOutput && aiOutput.innerHTML && lastAIText),
         savedAt: new Date().toISOString(),
-        // uiMode:: "simple" | "academic" でなく現在の表示モード。復元時は常に現在モードで再現
       };
-      sessionStorage.setItem(DIV_STATE_KEY, JSON.stringify(state));
-      console.log("占い状態を保存しました");
+      // 外部タブ遷移でも消えないよう localStorage を主記憶とし、同一タブ高速復元用に sessionStorage にも書く
+      try { localStorage.setItem(DIV_STATE_KEY, JSON.stringify(state)); } catch (e) {}
+      try { sessionStorage.setItem(DIV_STATE_KEY, JSON.stringify(state)); } catch (e) {}
+      console.log("占い状態（＋式神解釈）を保存しました");
     } catch (e) {
       console.error("状態保存エラー:", e.message);
     }
   }
-
-  // 保存された占い状態があれば、占い結果画面を再構築する
+  // 保存された占い状態があれば、「占い結果画面」を再構築し、式神解釈（あれば）も再表示する
+  // ・localStorage を主記憶とし（外部タブ遷移でも維持）、sessionStorage はフォールバック的に使う
+  // ・占い結果（values）だけでなく、式神解釈テキスト（aiText）も復元する
   function restoreDivinationState() {
     try {
-      const raw = sessionStorage.getItem(DIV_STATE_KEY);
-      if (!raw) return false;
-      const state = JSON.parse(raw);
-      if (!state.values || state.values.length !== 6) return false;
+      // localStorage → sessionStorage の順でスナップショットを読み出す
+      let raw = null;
+      try { raw = localStorage.getItem(DIV_STATE_KEY); } catch (e) {}
+      let state = null;
+      if (raw) { try { state = JSON.parse(raw); } catch (e) { state = null; } }
+      if (!state) {
+        try { raw = sessionStorage.getItem(DIV_STATE_KEY); } catch (e) {}
+        if (raw) { try { state = JSON.parse(raw); } catch (e) { state = null; } }
+      }
+      if (!state || !state.values || state.values.length !== 6) return false;
 
-      // 復元対象の爻値をセット
+      // 復元対象の爻値をセット（占い結果画面の再計算に必要）
       values = state.values;
       tossCount = 6;
 
@@ -769,22 +788,36 @@
         try { updateCount(); } catch (e) {}
       }
 
-      // 結果画面を再構築（showResult が内部で calc → HTML表示 → 履歴保存も行う）
+      // 式神解釈を復元（スナップショットに aiText があれば）
+      if (state.aiText) {
+        lastAIText = state.aiText;
+      }
+
+      // 占い結果画面を再構築（showResult が内部で calc → 本卦・爻辞等をHTML表示する）
       aiArea.style.display = "block"; // 結果表示の準備（showResult 内でも制御される）
       showResult();
 
-      // 復元したらクリアして再発行を防ぐ
-      // ※ ただし、?paid=1 等で何度もリロードされても復元できるよう、処理後も保持しておく。
-      //   リセット（新しい占い）時にクリアする。
+      // 式神解釈も再表示（復元対象として保存されていれば、離脱前と同じ表示に戻す）
+      if (state.aiText && aiOutput) {
+        aiOutput.innerHTML = renderAIResponse(state.aiText);
+        if (state.hasShikigami) {
+          // 式神解釈まで表示した状態で離脱したので、その箇所までスクロール
+          setTimeout(() => {
+            try { aiOutput.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
+          }, 400);
+          console.log("式神解釈まで含めて画面状態を復元しました");
+          return true;
+        }
+      }
 
-      // 結果エリアへ自動スクロール
+      // 式神解釈が無い場合は、占い結果エリアまでスクロール
       setTimeout(() => {
         if (resultAreaSimple && resultAreaSimple.style.display === "block") {
           resultAreaSimple.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       }, 300);
 
-      console.log("占い状態を復元しました");
+      console.log("占い状態（占い結果）を復元しました");
       return true;
     } catch (e) {
       console.error("状態復元エラー:", e.message);
@@ -887,6 +920,9 @@
   async function onBuySingle() {
     try {
       btnAi.disabled = true;
+      // 決済画面へ遷移する直前に、今の画面（占い結果＋式神解釈）を確実に保存しておく
+      // ※ 外部タブ（Testing Panel等）遷移で sessionStorage が消えても、localStorage で復元できる
+      saveDivinationState();
       const url = await window.AppSupabase.createCheckout("single_500");
       aiOutput.innerHTML = `<p class="hint">Square の決済画面へ移動しています…</p>`;
       window.location.href = url;
@@ -900,6 +936,8 @@
   async function onBuyMonthly() {
     try {
       btnAi.disabled = true;
+      // 決済画面へ遷移する直前に、今の画面（占い結果＋式神解釈）を確実に保存しておく
+      saveDivinationState();
       const url = await window.AppSupabase.createCheckout("monthly_2980");
       aiOutput.innerHTML = `<p class="hint">Square の決済画面へ移動しています…</p>`;
       window.location.href = url;
@@ -1028,7 +1066,11 @@
 
       // AI解釈を履歴に保存
       saveAIResult(response, "ai");
+      // 式神解釈をメモリ変数に保持（決済遷移のスナップショット保存用）
+      lastAIText = response;
       aiOutput.innerHTML = renderAIResponse(response);
+      // 式神解釈まで含めて現在画面をスナップショット保存（決済等の外部遷移に備える）
+      saveDivinationState();
       aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       if (err.code === "PAYMENT_REQUIRED") {
@@ -1298,6 +1340,9 @@
     values = [];
     tossCount = 0;
     isBusy = false;
+    // 新しい占いを始める際は、前回の式神解釈をメモリからクリアする
+    // （localStorage のスナップショット（aiText）は消さない：決済復帰時に必要）
+    lastAIText = null;
 
     yaoResult.textContent = "—";
     yaoResult.classList.remove("active");
