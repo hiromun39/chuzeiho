@@ -1497,20 +1497,39 @@
       try { initHistoryArea(); } catch (e) { console.error("initHistoryArea:", e); }
       try { initAIArea(); } catch (e) { console.error("initAIArea:", e); }
 
-      // 決済からの復帰（?paid=1）処理：Squareから戻った直後に最新のプラン状態を再取得して表示する
+      // 決済からの復帰（?paid=1）処理。
+      // Squareから戻ってきた時は、初期画面ではなく「占い結果画面」を表示するのが正しい導線。
+      // ① 占い状態の復元（restoreDivinationState）→ ② 最新チケット表示の更新（updateAICreditDisplay）
+      // を順序保証して行う。両者は別DOM領域への操作なので共存できる。
       if (params.get("paid") === "1") {
-        // セッション・ログインが確立するのを待ってから、残チケット表示を更新する
-        setTimeout(() => {
-          updateAICreditDisplay();
-          console.log("決済から復帰: 残チケット等を再取得しました");
-          // ?paid=1 から復帰する直前に保存しておいた占い状態を復元
-          restoreDivinationState();
+        // ?paid=1 を URL から除去し、リロードで再発火しないようにする
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("paid");
+          history.replaceState(null, "", url.toString());
+        } catch (e) {}
+
+        // ログインセッション確立・描画安定を待ってから、復元とチケット更新を行う
+        setTimeout(async () => {
+          // ① 占い結果画面の状態を復元（sessionStorage の状態が残っていれば結果画面へ）
+          const restored = restoreDivinationState();
+          // ② 最新のプラン状態（残チケット）を再取得して表示更新
+          try {
+            await updateAICreditDisplay();
+            console.log("決済から復帰: 占い状態復元=" + restored + " / 残チケット等を再取得しました");
+          } catch (e) {
+            console.error("決済復帰: チケット表示更新エラー:", e);
+          }
         }, 2500);
       } else {
         // 通常のページアクセス時も、遷移前に保存した占い状態を復元（ログイン後リダイレクト等で初期画面に帰ってきた場合）
         // ※ 初期化の reset() 直後に行うため、少し遅延させて描画の順序を整える
-        setTimeout(() => {
+        setTimeout(async () => {
           restoreDivinationState();
+          // 通常アクセス時も、ログイン済みならプラン状態を取得して最新化（チケット等の表示を正しく）
+          if (window.AppSupabase && window.AppSupabase.user) {
+            try { await updateAICreditDisplay(); } catch (e) {}
+          }
         }, 300);
       }
     } catch (e) {
@@ -1530,6 +1549,19 @@
     const btnBuyMonthly = $("btn-buy-monthly");
     if (btnBuySingle) { try { btnBuySingle.addEventListener("click", onBuySingle); } catch (e) {} }
     if (btnBuyMonthly) { try { btnBuyMonthly.addEventListener("click", onBuyMonthly); } catch (e) {} }
+
+    // ページ再表示（ブラウザバック・bfcache復元・タブ復元）時に、ログイン済みなら
+    // プラン状態（残チケット等）を再取得して表示を最新化する。
+    // Square決済後に「戻るボタン」で戻った場合、URLに ?paid=1 が付かないため、
+    // 上記の決済復帰処理だけでは更新されない。この pageshow で確実に更新する。
+    window.addEventListener("pageshow", () => {
+      // ログイン確立済みならプラン状態を再取得（表示更新）
+      if (window.AppSupabase && window.AppSupabase.user) {
+        setTimeout(() => { try { updateAICreditDisplay(); } catch (e) { console.error("pageshow更新:", e); } }, 100);
+      }
+      // 遷移直前に保存しておいた占い状態を復元（既存挙動を維持）
+      setTimeout(() => { try { restoreDivinationState(); } catch (e) {} }, 300);
+    });
   });
 
 })();
