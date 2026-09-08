@@ -744,9 +744,10 @@
   // 直近の式神解釈テキスト（保存・復元用の変数）
   let lastAIText = null;
 
-  // 現在の占い状態（占い結果 ＋ 式神解釈）を sessionStorage にのみ保存する
-  // ※ sessionStorage は「同一タブ・同一セッション」限定で、F5・新規タブ・通常アクセスでは
-  //   古い状態が固着しない。復元は Square 決済の ?paid=1 復帰時のみに行い、回復後は破棄する。
+  // 現在の占い状態（占い結果 ＋ 式神解釈）を localStorage に保存する
+  // ※ Square の決済（Payment Link）は新しいタブ/ウィンドウで開くため、sessionStorage では
+  //   別タブの ?paid=1 復帰ページにデータが渡らない。localStorage はタブを跨いで共有されるので安全。
+  //   固着防止のため、復元処理（restoreDivinationState）が呼ばれたら直後に localStorage から削除する。
   // - values / fortune: 占い結果画面を再構築するため
   // - aiText: 式神解釈（あれば）を再表示するため
   // - hasShikigami: 式神解釈が表示済みか
@@ -761,9 +762,11 @@
         hasShikigami: !!(aiOutput && aiOutput.innerHTML && lastAIText),
         savedAt: new Date().toISOString(),
       };
-      // sessionStorage のみに保存（localStorage には保存しない＝古い状態が固着するのを防ぐ）
+      // localStorage に保存（タブ跨ぎでも共有できる。復元後は削除）
+      try { localStorage.setItem(DIV_STATE_KEY, JSON.stringify(state)); } catch (e) {}
+      // 同一タブ高速復元用に sessionStorage にも書いておく（補助）
       try { sessionStorage.setItem(DIV_STATE_KEY, JSON.stringify(state)); } catch (e) {}
-      console.log("占い状態（＋式神解釈）を sessionStorage に保存しました");
+      console.log("占い状態（＋式神解釈）を localStorage に保存しました");
     } catch (e) {
       console.error("状態保存エラー:", e.message);
     }
@@ -773,12 +776,19 @@
   // ・占い結果（values）だけでなく、式神解釈テキスト（aiText）も復元する
   function restoreDivinationState() {
     try {
-      // sessionStorage のみからスナップショットを読み出す
-      // （localStorage は固着の原因となるため、一切参照しない）
+      // ① まず sessionStorage（同一タブ高速復元用）を読み、無ければ localStorage（タブ跨ぎ用）も試す
       let raw = null;
       try { raw = sessionStorage.getItem(DIV_STATE_KEY); } catch (e) {}
       let state = null;
       if (raw) { try { state = JSON.parse(raw); } catch (e) { state = null; } }
+      if (!state) {
+        try { raw = localStorage.getItem(DIV_STATE_KEY); } catch (e) {}
+        if (raw) { try { state = JSON.parse(raw); } catch (e) { state = null; } }
+      }
+      // ② 読めたら必ず両方から削除する（次回・他ページでの固着を防ぐ）
+      try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+      try { localStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+
       if (!state || !state.values || state.values.length !== 6) return false;
 
       // ── 多重復元ガード ──
@@ -1468,9 +1478,10 @@
 
   // ---------- コイン投げ1回 ----------
   function tossOne() {
-    // 新しい占いを始めるため、前回の復元スナップショット（sessionStorage）を破棄する
+    // 新しい占いを始めるため、前回の復元スナップショット（localStorage/sessionStorage）を破棄する
     // ※ これにより、新しい占い中に ?paid=1 へ遷移しても古い占いを復元しない（固着防止）
     try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+    try { localStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
 
     // 合計で6回まで
     if (tossCount >= 6 || isBusy) return;
@@ -1508,8 +1519,9 @@
 
   // ---------- 一括実行 ----------
   function tossAll() {
-    // 新しい占いを始めるため、前回の復元スナップショット（sessionStorage）を破棄する
+    // 新しい占いを始めるため、前回の復元スナップショット（localStorage/sessionStorage）を破棄する
     try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+    try { localStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
 
     if (isBusy) return;
     isBusy = true;
