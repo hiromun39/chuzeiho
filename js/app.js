@@ -52,6 +52,11 @@
   let isBusy = false;   // 忙しいフラグ
   let lastResult = null; // 最後の占い結果（履歴保存用）
 
+  // 復元描画中フラグ（showResult 内の履歴保存を抑止する＝履歴の重複防止）
+  let isRestoreRender = false;
+  // 同一スナップショットの多重復元を防ぐための記録
+  let lastRestoreSnapshot = null;
+
   // ---------- モード管理 ----------
   const MODE_KEY = "eki-sen-ui-mode";
   const CEREMONY_KEY = "eki-sen-ceremony-done";
@@ -637,7 +642,7 @@
         henyo: c.henyoPositions,
         kaji: c.honkaku ? c.honkaku.kaji : ""
       };
-      saveHistory(lastResult);
+      if (!isRestoreRender) saveHistory(lastResult);  // 復元描画中は履歴を重複保存しない
       aiArea.style.display = "block";
       // 画面状態をストレージに保存（決済・ログイン画面への遷移からの復帰用）
       saveDivinationState();
@@ -721,7 +726,7 @@
       henyo: c.henyoPositions,
       kaji: c.honkaku ? c.honkaku.kaji : ""
     };
-    saveHistory(lastResult);
+    if (!isRestoreRender) saveHistory(lastResult);  // 復元描画中は履歴を重複保存しない
 
     // AIエリア表示
     aiArea.style.display = "block";
@@ -778,6 +783,18 @@
       }
       if (!state || !state.values || state.values.length !== 6) return false;
 
+      // ── 多重復元ガード ──
+      // DOMContentLoaded 内・pageshow で復元が重複して呼ばれ、showResult→saveHistory により
+      // 履歴が多重に増えるのを防ぐ。同一スナップショット（values のJSON文字列）が既に復元済みなら、
+      // 再描画せずに早期 return する（履歴の重複防止＝履歴3重複バグの根本対策）。
+      const snapshotKey = JSON.stringify(state.values) + "|" + JSON.stringify(state.fortune) + "|" + (state.aiText || "");
+      if (lastRestoreSnapshot === snapshotKey) {
+        // 既に同一状態で描画済み：DOMはそのまま維持。ただし式神解釈表示は復元済み前提。
+        console.log("同一スナップショットのため復元スキップ（多重復元防止）");
+        return true;
+      }
+      lastRestoreSnapshot = snapshotKey;
+
       // 復元対象の爻値をセット（占い結果画面の再計算に必要）
       values = state.values;
       tossCount = 6;
@@ -793,9 +810,15 @@
         lastAIText = state.aiText;
       }
 
-      // 占い結果画面を再構築（showResult が内部で calc → 本卦・爻辞等をHTML表示する）
+      // 占い結果画面を再構築（showResult は内部で saveHistory 呼ぶが、
+      // isRestoreRender=true の間は履歴保存をスキップ＝重複防止）
       aiArea.style.display = "block"; // 結果表示の準備（showResult 内でも制御される）
-      showResult();
+      isRestoreRender = true;
+      try {
+        showResult();
+      } finally {
+        isRestoreRender = false;
+      }
 
       // 式神解釈も再表示（復元対象として保存されていれば、離脱前と同じ表示に戻す）
       if (state.aiText && aiOutput) {
@@ -1071,6 +1094,10 @@
       aiOutput.innerHTML = renderAIResponse(response);
       // 式神解釈まで含めて現在画面をスナップショット保存（決済等の外部遷移に備える）
       saveDivinationState();
+      // 残チケット表示を即時更新（サーバー側で1消費された最新値を反映）
+      // ※ 式神託宣は /api/ai で credit/回数が消費される。成功直後に /api/plans を再取得して
+      //    残チケットを最新化する（従来はページ再表示まで更新されず「減らない」ように見えた）
+      try { await updateAICreditDisplay(); } catch (e) { console.error("残チケット表示更新エラー:", e.message); }
       aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       if (err.code === "PAYMENT_REQUIRED") {
