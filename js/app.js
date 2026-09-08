@@ -744,10 +744,12 @@
   // 直近の式神解釈テキスト（保存・復元用の変数）
   let lastAIText = null;
 
-  // 現在の占い状態（占い結果 ＋ 式神解釈を含む完全スナップショット）を localStorage へ保存
+  // 現在の占い状態（占い結果 ＋ 式神解釈）を sessionStorage にのみ保存する
+  // ※ sessionStorage は「同一タブ・同一セッション」限定で、F5・新規タブ・通常アクセスでは
+  //   古い状態が固着しない。復元は Square 決済の ?paid=1 復帰時のみに行い、回復後は破棄する。
   // - values / fortune: 占い結果画面を再構築するため
   // - aiText: 式神解釈（あれば）を再表示するため
-  // - hasShikigami: 式神解釈が表示済みか（true なら結果表示の後に託宣も表示）
+  // - hasShikigami: 式神解釈が表示済みか
   function saveDivinationState() {
     try {
       if (!values || values.length !== 6) return; // 占い未完了時は保存しない
@@ -759,10 +761,9 @@
         hasShikigami: !!(aiOutput && aiOutput.innerHTML && lastAIText),
         savedAt: new Date().toISOString(),
       };
-      // 外部タブ遷移でも消えないよう localStorage を主記憶とし、同一タブ高速復元用に sessionStorage にも書く
-      try { localStorage.setItem(DIV_STATE_KEY, JSON.stringify(state)); } catch (e) {}
+      // sessionStorage のみに保存（localStorage には保存しない＝古い状態が固着するのを防ぐ）
       try { sessionStorage.setItem(DIV_STATE_KEY, JSON.stringify(state)); } catch (e) {}
-      console.log("占い状態（＋式神解釈）を保存しました");
+      console.log("占い状態（＋式神解釈）を sessionStorage に保存しました");
     } catch (e) {
       console.error("状態保存エラー:", e.message);
     }
@@ -772,15 +773,12 @@
   // ・占い結果（values）だけでなく、式神解釈テキスト（aiText）も復元する
   function restoreDivinationState() {
     try {
-      // localStorage → sessionStorage の順でスナップショットを読み出す
+      // sessionStorage のみからスナップショットを読み出す
+      // （localStorage は固着の原因となるため、一切参照しない）
       let raw = null;
-      try { raw = localStorage.getItem(DIV_STATE_KEY); } catch (e) {}
+      try { raw = sessionStorage.getItem(DIV_STATE_KEY); } catch (e) {}
       let state = null;
       if (raw) { try { state = JSON.parse(raw); } catch (e) { state = null; } }
-      if (!state) {
-        try { raw = sessionStorage.getItem(DIV_STATE_KEY); } catch (e) {}
-        if (raw) { try { state = JSON.parse(raw); } catch (e) { state = null; } }
-      }
       if (!state || !state.values || state.values.length !== 6) return false;
 
       // ── 多重復元ガード ──
@@ -1470,6 +1468,10 @@
 
   // ---------- コイン投げ1回 ----------
   function tossOne() {
+    // 新しい占いを始めるため、前回の復元スナップショット（sessionStorage）を破棄する
+    // ※ これにより、新しい占い中に ?paid=1 へ遷移しても古い占いを復元しない（固着防止）
+    try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+
     // 合計で6回まで
     if (tossCount >= 6 || isBusy) return;
 
@@ -1506,6 +1508,9 @@
 
   // ---------- 一括実行 ----------
   function tossAll() {
+    // 新しい占いを始めるため、前回の復元スナップショット（sessionStorage）を破棄する
+    try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+
     if (isBusy) return;
     isBusy = true;
     btnToss.disabled = true;
@@ -1573,6 +1578,8 @@
       // Squareから戻ってきた時は、初期画面ではなく「占い結果画面」を表示するのが正しい導線。
       // ① 占い状態の復元（restoreDivinationState）→ ② 最新チケット表示の更新（updateAICreditDisplay）
       // を順序保証して行う。両者は別DOM領域への操作なので共存できる。
+      // Square 決済のリダイレクト（redirect_url=?paid=1）からの復帰時のみ、直前の占い状態を復元する。
+      // ※ F5・新タブ・直接URLなどの通常アクセスでは絶対に復元しない（古い占いが固着するのを防ぐ）。
       if (params.get("paid") === "1") {
         // ?paid=1 を URL から除去し、リロードで再発火しないようにする
         try {
@@ -1583,9 +1590,11 @@
 
         // ログインセッション確立・描画安定を待ってから、復元とチケット更新を行う
         setTimeout(async () => {
-          // ① 占い結果画面の状態を復元（sessionStorage の状態が残っていれば結果画面へ）
+          // ① 占い結果＋式神解釈の状態を復元
           const restored = restoreDivinationState();
-          // ② 最新のプラン状態（残チケット）を再取得して表示更新
+          // ② 復元したら保存状態を消費（sessionStorage から破棄）して、固着・再発を防ぐ
+          try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+          // ③ 最新のプラン状態（残チケット）を再取得して表示更新
           try {
             await updateAICreditDisplay();
             console.log("決済から復帰: 占い状態復元=" + restored + " / 残チケット等を再取得しました");
@@ -1594,11 +1603,9 @@
           }
         }, 2500);
       } else {
-        // 通常のページアクセス時も、遷移前に保存した占い状態を復元（ログイン後リダイレクト等で初期画面に帰ってきた場合）
-        // ※ 初期化の reset() 直後に行うため、少し遅延させて描画の順序を整える
+        // 通常アクセス（F5・新タブ・直接URL）＝初期画面を表示。
+        // 占い状態は復元しない。ログイン済みなら残チケット等の最新化のみ行う。
         setTimeout(async () => {
-          restoreDivinationState();
-          // 通常アクセス時も、ログイン済みならプラン状態を取得して最新化（チケット等の表示を正しく）
           if (window.AppSupabase && window.AppSupabase.user) {
             try { await updateAICreditDisplay(); } catch (e) {}
           }
@@ -1627,12 +1634,12 @@
     // Square決済後に「戻るボタン」で戻った場合、URLに ?paid=1 が付かないため、
     // 上記の決済復帰処理だけでは更新されない。この pageshow で確実に更新する。
     window.addEventListener("pageshow", () => {
-      // ログイン確立済みならプラン状態を再取得（表示更新）
+      // ログイン済みなら残チケット表示を最新化する。
+      // ※「占い状態の復元」はここでは実行しない（pageshow=通常の再表示で、F5・戻る・新規表示でも
+      //    古い占いを復元してしまうと固着するため。復元は Square 決済の ?paid=1 復帰時のみ）。
       if (window.AppSupabase && window.AppSupabase.user) {
         setTimeout(() => { try { updateAICreditDisplay(); } catch (e) { console.error("pageshow更新:", e); } }, 100);
       }
-      // 遷移直前に保存しておいた占い状態を復元（既存挙動を維持）
-      setTimeout(() => { try { restoreDivinationState(); } catch (e) {} }, 300);
     });
   });
 
