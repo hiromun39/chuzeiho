@@ -963,15 +963,33 @@
     }
   }
 
-  // 月額サブスク登録（Square Checkout URL へリダイレクト）
+  // 月額サブスク登録（CreateSubscription 方式・2026/9/9 実装）
+  //
+  // 【重要】Sandbox 検証段階では、カード nonce を「固定テスト nonce」で代替する。
+  //   本番のカード入力（Web Payments SDK）へ移行する際は、この nonce 取得部分を
+  //   Web Payments SDK の tokenize() 結果に差し替える（下記 getSubscriptionNonce 参照）。
+  async function getSubscriptionNonce() {
+    // ★ Sandbox 固定テスト nonce（フロント実装・カード入力フォームの代用）
+    //   本番切替時（SQUARE_ENV=production）は、必ず Web Payments SDK の nonce に置き換えること。
+    return "cnon:card-nonce-ok";
+  }
+
   async function onBuyMonthly() {
     try {
       btnAi.disabled = true;
-      // 決済画面へ遷移する直前に、今の画面（占い結果＋式神解釈）を確実に保存しておく
-      saveDivinationState();
-      const url = await window.AppSupabase.createCheckout("monthly_2980");
-      aiOutput.innerHTML = `<p class="hint">Square の決済画面へ移動しています…</p>`;
-      window.location.href = url;
+      aiOutput.innerHTML = `<p class="hint">🔐 ご登録を処理しています…</p>`;
+
+      // ① カード nonce を取得（Sandbox検証中は固定nonce）
+      const nonce = await getSubscriptionNonce();
+
+      // ② Worker の /api/subscription/start を呼び、CreateSubscription で開始
+      const result = await window.AppSupabase.startSubscription(nonce);
+
+      // ③ 成功: サブスク状態を反映して表示を更新
+      aiOutput.innerHTML = `<p class="hint">✅ 月額プランにご登録いただきました。プラン状態を更新します…</p>`;
+      await updateAICreditDisplay();
+      const billingAreaEl = $("billing-area");
+      if (billingAreaEl) billingAreaEl.style.display = "block";
     } catch (e) {
       aiOutput.innerHTML = `<p class="ai-error">⚠️ ${e.message}</p>`;
       btnAi.disabled = false;

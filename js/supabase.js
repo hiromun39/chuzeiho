@@ -126,6 +126,16 @@
       return data; // { success, message }
     },
 
+    // サブスク開始（/api/subscription/start・CreateSubscription方式）
+    // nonce には Web Payments SDK で発行したカード nonce を渡す（Sandbox デバッグ時は "cnon:card-nonce-ok"）
+    async startSubscription(nonce) {
+      const data = await this._apiFetch("/api/subscription/start", {
+        method: "POST",
+        body: { nonce },
+      });
+      return data; // { success, subscription }
+    },
+
     // ---------- 履歴DB操作 ----------
 
     // DBから全履歴を取得し、localStorage の未同期データとマージして反映
