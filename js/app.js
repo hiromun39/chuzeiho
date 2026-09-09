@@ -914,6 +914,15 @@
       if (sub.currentPeriodEnd) {
         const d = new Date(sub.currentPeriodEnd);
         html += `<p class="billing-period">有効期限: ${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}</p>`;
+        const today = new Date();
+        // 有効期限が過去（start_dateと同値などの過去値）の場合は仮の表示（判定は status で行う）
+        if (d < today) {
+          html += `<p class="billing-period-sub">※ 有効期限は次回更新日(Square)から反映されます。無制限でご利用いただけます。</p>`;
+        }
+      }
+      // サブスク有効中でも保有チケット（失われない）を併記して、ユーザーに安心を与える
+      if (credits > 0) {
+        html += `<div class="billing-badge credit">🎫 残チケット: ${credits} 枚（サブスク解約後もご利用いただけます）</div>`;
       }
     } else {
       if (hasFree) {
@@ -922,7 +931,7 @@
       if (credits > 0) {
         html += `<div class="billing-badge credit">🎫 残チケット: ${credits} 枚</div>`;
       }
-      if (sub.status && sub.status !== "none") {
+      if (sub.status && sub.status !== "none" && (sub.status.toLowerCase() !== "active")) {
         html += `<div class="billing-badge">💳 サブスク状態: ${sub.status}</div>`;
       }
     }
