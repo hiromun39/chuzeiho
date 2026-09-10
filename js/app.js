@@ -993,8 +993,14 @@
   //   本番のカード入力（Web Payments SDK）へ移行する際は、この nonce 取得部分を
   //   Web Payments SDK の tokenize() 結果に差し替える（下記 getSubscriptionNonce 参照）。
   async function getSubscriptionNonce() {
-    // ★ Sandbox 固定テスト nonce（フロント実装・カード入力フォームの代用）
-    //   本番切替時（SQUARE_ENV=production）は、必ず Web Payments SDK の nonce に置き換えること。
+    // 本番: Square Web Payments SDK のカード入力フォームを開き、tokenize() で nonce を生成する。
+    //  - Application ID / Location ID は chuzeiho/js/square.js に定義（公開情報）
+    //  - カード情報は Square の安全なフォーム内で処理され、自サイトには一切残らない
+    //  - キャンセル時は reject され、呼び出し側（onBuyMonthly）の catch で処理される
+    if (window.AppSquare && typeof window.AppSquare.requestCardNonce === "function") {
+      return await window.AppSquare.requestCardNonce();
+    }
+    // フォールバック（SDK未読込時）：Sandbox の固定 nonce（開発用）
     return "cnon:card-nonce-ok";
   }
 

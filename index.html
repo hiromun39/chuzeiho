@@ -176,6 +176,21 @@
       </div>
     </section>
 
+    <!-- ⑤c カード入力モーダル（Square Web Payments SDK・本番サブスク登録時に表示） -->
+    <div id="square-card-modal" class="square-modal-overlay" style="display:none;">
+      <div class="square-modal">
+        <h3 class="square-modal-title">🔐 カード情報のご登録</h3>
+        <p class="square-modal-note">お支払いは Square の安全なフォームで処理されます。カード情報がこのサイトに残ることはありません。</p>
+        <div id="square-card-container"></div>
+        <div id="square-card-error" class="square-modal-error" style="display:none;"></div>
+        <div class="square-modal-actions">
+          <button id="square-card-cancel" class="btn btn-secondary">キャンセル</button>
+          <button id="square-card-submit" class="btn btn-buy">このカードで登録する</button>
+        </div>
+        <p class="square-modal-price">月額 ¥2,980（毎月自動更新・無制限）</p>
+      </div>
+    </div>
+
     <!-- ⑥ 占い履歴 -->
     <section class="section" id="history-area">
       <h2>占い履歴</h2>
@@ -220,6 +235,8 @@
 
 <!-- スクリプト読み込み -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Square Web Payments SDK（本番カード入力用・Application ID/Location ID は公開情報） -->
+<script src="https://web.squarecdn.com/v1/square.js"></script>
 <script src="data/rokujuyonka.js"></script>
 <script src="data/catch_messages.js"></script>
 <script src="data/yaoji_part1.js"></script>
@@ -228,6 +245,7 @@
 <script src="js/kakei.js"></script>
 <script src="js/chuzeiho.js"></script>
 <script src="js/supabase.js"></script>
+<script src="js/square.js"></script>
 <script src="js/app.js"></script>
 <script>
   // Service Worker 登録（PWA・オフライン対応）
