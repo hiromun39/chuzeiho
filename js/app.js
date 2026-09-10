@@ -1014,6 +1014,15 @@
       await updateAICreditDisplay();
       const billingAreaEl = $("billing-area");
       if (billingAreaEl) billingAreaEl.style.display = "block";
+
+      // ④ 契約後は式神託宣ボタンを再び押せるように戻す（サブスク有効で無制限利用可能）。
+      //    ※ 直前で btnAi.disabled = true にしているため、ここで戻さないと
+      //      契約完了後もボタンがグレーアウトしたままになる（2026/9/10 修正）。
+      btnAi.disabled = false;
+      // ⑤ この画面のまま託宣を受けられるよう案内する。
+      //    （再読み込みすると初期画面に戻り、占い結果・式神導線が失われるため）
+      aiOutput.innerHTML += `<p class="hint">🔮 プランの反映が完了しました。この画面のまま「式神の託宣を受ける」ボタンを押してください（ページの再読み込みはしないでください）。</p>`;
+      aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
       aiOutput.innerHTML = `<p class="ai-error">⚠️ ${e.message}</p>`;
       btnAi.disabled = false;
