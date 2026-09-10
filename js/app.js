@@ -1003,6 +1003,11 @@
       btnAi.disabled = true;
       aiOutput.innerHTML = `<p class="hint">🔐 ご登録を処理しています…</p>`;
 
+      // ⓪ 念のため、契約処理の前に現在の画面（占い結果＋式神解釈）を保存しておく。
+      //    本番の Web Payments SDK では通常ページ遷移しないが、3Dセキュア等で
+      //    万一リダイレクトが発生しても占い結果を失わないための保険（2026/9/10 追加）。
+      try { saveDivinationState(); } catch (e) {}
+
       // ① カード nonce を取得（Sandbox検証中は固定nonce）
       const nonce = await getSubscriptionNonce();
 
