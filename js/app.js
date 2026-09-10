@@ -199,6 +199,15 @@
     el.textContent = `現在 ${history.length} 件`;
   }
 
+  // ---------- 変爻位置のラベル整形 ----------
+  // henyo（1=初爻〜6=上爻 の配列）を「上、五、初爻変」の形式へ（上→初の降順）。
+  // 例: [1,2,5] → "上、五、初爻変"。変爻なし（空）なら ""（何も表示しない）。
+  function formatHenyoLabel(henyo) {
+    if (!henyo || henyo.length === 0) return "";
+    const names = { 1: "初", 2: "二", 3: "三", 4: "四", 5: "五", 6: "上" };
+    return henyo.slice().sort((a, b) => b - a).map(p => names[p] || p).join("、") + "爻変";
+  }
+
   // ---------- 履歴表示 ----------
   function showHistory() {
     const history = getHistory();
@@ -223,12 +232,16 @@
       const fortune = h.fortune ? `<div class="history-fortune">${h.fortune}</div>` : "";
       const aiText = h.aiText ? '<div class="history-ai"><b>AI解釈</b><br>' + h.aiText.replace(/&/g, escAmp).replace(/</g, escLt).replace(/>/g, escGt) + '</div>' : "";
 
+      // 変爻位置ラベル（例: "上、五、初爻変"）。変爻なしなら空文字
+      const henyoLabel = formatHenyoLabel(h.henyo);
+
       // 一般モード：シンボル・卦名の視覚表示
       if (!academic) {
         const honSym = h.honkaku ? `<span class="history-symbol">${h.honkaku.symbol || "☯"}</span>` : "";
         const honName = h.honkaku ? `<b>${h.honkaku.name}</b>` : "—";
+        // 「天雷无妄 上、五、初爻変 → 雷地豫」の形式（変爻なしなら卦名のみ）
         const shiName = h.shikaku && h.henyo && h.henyo.length > 0
-          ? ` <span class="history-arrow">→</span> ${h.shikaku.name}`
+          ? ` ${henyoLabel} <span class="history-arrow">→</span> ${h.shikaku.name}`
           : "";
         return `
           <div class="history-item-simple">
@@ -237,19 +250,21 @@
               <div class="history-date-simple">${dateStr}</div>
               <div class="history-kua-simple">${honName}${shiName}</div>
               ${fortune}
+              ${aiText}
             </div>
           </div>
         `;
       }
 
-      // 学術モード：従来の詳細表示
+      // 学術モード：従来の詳細表示（変爻位置を本卦と之卦の間に表示）
       const hon = h.honkaku ? `<b>${h.honkaku.name}</b>（第${h.honkaku.n}卦）` : "—";
       const shi = h.shikaku ? `${h.shikaku.name}（第${h.shikaku.n}卦）` : "—";
+      const henyoSeg = (h.henyo && h.henyo.length > 0) ? ` ${henyoLabel}` : "";
       return `
         <div class="history-item">
           <div class="history-date">${dateStr}</div>
           <div class="history-body">
-            <div class="history-kua">本卦 ${hon} ${h.henyo && h.henyo.length > 0 ? `／ 之卦 ${shi}` : ""}</div>
+            <div class="history-kua">本卦 ${hon}${henyoSeg}${h.henyo && h.henyo.length > 0 ? `／ 之卦 ${shi}` : ""}</div>
             ${fortune}
             ${aiText}
           </div>

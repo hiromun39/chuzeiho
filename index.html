@@ -185,7 +185,8 @@
         <button id="btn-history" class="btn btn-secondary">履歴を読み込む</button>
         <button id="btn-export" class="btn btn-secondary">CSVで書き出す</button>
         <button id="btn-export-json" class="btn btn-secondary">JSONでバックアップ</button>
-        <button id="btn-clear-all" class="btn btn-reset">全削除</button>
+        <!-- 全削除ボタンは誤操作防止のため一旦非表示（後日、選択削除などを設計してから復活） -->
+        <button id="btn-clear-all" class="btn btn-reset" style="display:none;">全削除</button>
       </div>
       <div id="history-list" class="history-list"></div>
     </section>
@@ -207,7 +208,8 @@
 
   <!-- フッター -->
   <footer class="footer">
-    <div class="mode-switch" id="mode-switch">
+    <!-- 学術モード切替は一旦非表示（アップデートでお披露目予定。将来復活させるため DOM は残す） -->
+    <div class="mode-switch" id="mode-switch" style="display:none;">
       <span id="mode-switch-label"></span>
       <button id="btn-mode-toggle" class="btn btn-mode">モードを切り替える</button>
     </div>
