@@ -123,12 +123,20 @@ body {
 }
 
 .auth-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.85rem;
   color: var(--text);
   background: var(--washi-dark);
   border: 1px solid var(--kin);
   border-radius: 20px;
   padding: 4px 12px;
+}
+
+.auth-user-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 .btn-auth {
@@ -873,6 +881,18 @@ body {
 
 .footer-links a:hover {
   text-decoration: underline;
+}
+
+/* お問い合わせ（利用規約等の下段・控えめに区別） */
+.footer-contact {
+  margin-top: 1em;
+}
+.footer-contact a {
+  color: #b98a6e;
+  text-decoration: underline;
+}
+.footer-contact a:hover {
+  color: var(--shu);
 }
 
 /* ---------- 一般モード：説明の折りたたみ ---------- */
@@ -1750,6 +1770,23 @@ body {
 /* =========================================
    PWA導線
    ========================================= */
+/* 占い方カード内のPWA導線（控えめ・アコーディオン） */
+.pwa-inline {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--washi-dark);
+}
+.pwa-inline-head {
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-sub);
+}
+.pwa-inline #pwa-guide-body {
+  padding-top: 10px;
+}
+
 .pwa-guide-actions {
   margin-top: 14px;
   display: flex;

@@ -81,6 +81,9 @@
   // 同一スナップショットの多重復元を防ぐための記録
   let lastRestoreSnapshot = null;
 
+  // 課金カードを「占う前」に折りたたむ際、ユーザーが手動で展開したかどうか
+  let billingUserExpanded = false;
+
   // PWAインストール（Android Chrome系で beforeinstallprompt を捕捉して保持）
   let deferredInstallPrompt = null;
   const PWA_TOAST_KEY = "eki-sen-pwa-toast-shown";
@@ -261,15 +264,11 @@
       // 式神解釈は折りたたみ表示（初期は閉じる）。卦辞・占的などはそのまま表示。
       const aiText = h.aiText ? '<details class="history-ai-fold"><summary>式神解釈を見る</summary><div class="history-ai">' + h.aiText.replace(/&/g, escAmp).replace(/</g, escLt).replace(/>/g, escGt) + '</div></details>' : "";
 
-      // 鑑定の再表示ボタン（保存済みデータから占い結果画面を無料で復元する。APIは叩かない）
-      const replayBtn = h.honkaku ? `<button type="button" class="history-replay-btn" data-ts="${h.ts}">🔮 この鑑定をもう一度見る</button>` : "";
-
       // 変爻位置ラベル（例: "上、五、初爻変"）。変爻なしなら空文字
       const henyoLabel = formatHenyoLabel(h.henyo);
 
-      // 一般モード：シンボル・卦名の視覚表示
+      // 一般モード：卦名の視覚表示（太極図シンボルは表示しない）
       if (!academic) {
-        const honSym = h.honkaku ? `<span class="history-symbol">${h.honkaku.symbol || "☯"}</span>` : "";
         const honName = h.honkaku ? `<b>${h.honkaku.name}</b>` : "—";
         // 「天雷无妄 上、五、初爻変 → 雷地豫」の形式（変爻なしなら卦名のみ）
         const shiName = h.shikaku && h.henyo && h.henyo.length > 0
@@ -277,13 +276,11 @@
           : "";
         return `
           <div class="history-item-simple">
-            ${honSym}
             <div class="history-info">
               <div class="history-date-simple">${dateStr}</div>
               <div class="history-kua-simple">${honName}${shiName}</div>
               ${fortune}
               ${aiText}
-              ${replayBtn}
             </div>
           </div>
         `;
@@ -300,22 +297,12 @@
             <div class="history-kua">本卦 ${hon}${henyoSeg}${h.henyo && h.henyo.length > 0 ? `／ 之卦 ${shi}` : ""}</div>
             ${fortune}
             ${aiText}
-            ${replayBtn}
           </div>
         </div>
       `;
     }).join("");
 
     container.innerHTML = rows;
-
-    // 鑑定の再表示ボタンにイベントを付与（data-ts で該当履歴を特定）
-    container.querySelectorAll(".history-replay-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const ts = btn.getAttribute("data-ts");
-        const rec = getHistory().find(h => h.ts === ts);
-        if (rec) replayHistory(rec);
-      });
-    });
   }
 
   // ---------- 履歴レコードから爻値（values）を復元 ----------
@@ -781,6 +768,8 @@
           has_shikaku: !!c.shikaku
         });
       }
+      // 占い結果を表示した＝「占った後」。課金カードを開いた状態に切り替える
+      applyBillingFold();
       return;
     }
 
@@ -1004,16 +993,56 @@
 
   // ---------- 課金・プラン状態の表示管理（Square Checkout 導線） ----------
 
+  // 占い結果が表示されているか（「占った後」判定に使う）
+  function isDivinationShown() {
+    return (resultAreaSimple && resultAreaSimple.style.display === "block") ||
+           (resultArea && resultArea.style.display === "block");
+  }
+
+  // 「初回無料」案内文言の出し分け（無料枠が残っている人にだけ表示する）
+  function setAiLoginNote(show) {
+    const note = $("ai-login-note");
+    if (note) note.style.display = show ? "" : "none";
+  }
+
+  // 課金カードの見出し・折りたたみを「占う前／占った後」で切り替える。
+  // - 占う前：折りたたんで閉じる。見出しは「残チケット・プランを確認する」。
+  // - 占った後：開いたまま表示。見出しは「プラン・残チケット」。
+  // サブスク有効中でも占う前は折りたたむ（占い以外に考えさせないため）。
+  function applyBillingFold() {
+    const headTitle = $("billing-head-title");
+    const foldIcon = $("billing-fold-icon");
+    const area = $("billing-area");
+    const head = $("billing-head");
+    if (!headTitle || !area) return;
+
+    const after = isDivinationShown();
+    if (after) {
+      headTitle.textContent = "プラン・残チケット";
+      if (foldIcon) { foldIcon.style.display = "none"; foldIcon.classList.remove("open"); }
+      area.style.display = "block";
+      if (head) head.classList.remove("collapsible-head");
+    } else {
+      headTitle.textContent = "残チケット・プランを確認する";
+      if (foldIcon) { foldIcon.style.display = "inline-block"; foldIcon.classList.toggle("open", billingUserExpanded); }
+      area.style.display = billingUserExpanded ? "block" : "none";
+      if (head) head.classList.add("collapsible-head");
+    }
+  }
+
   // 課金エリア全体の表示を更新。ログイン状態・プラン状態に応じて出し分ける。
   async function updateAICreditDisplay() {
     const el = $("ai-credit");
+    const billingSection = $("billing-section");
     const billingArea = $("billing-area");
     if (!el) return;
     const loggedIn = !!(window.AppSupabase && window.AppSupabase.user);
     if (!loggedIn) {
       // 未ログイン：購入導線は出さない（ログイン案内のみ）
       el.innerHTML = `<span class="ai-credit-free">※ 式神の託宣にはログインが必要です。</span>`;
+      if (billingSection) billingSection.style.display = "none";
       if (billingArea) billingArea.style.display = "none";
+      setAiLoginNote(true);
       return;
     }
 
@@ -1026,14 +1055,25 @@
     } catch (e) {
       // /api/plans が失敗しても致命的でない。静かに購入導線だけ隠す
       console.error("プラン取得エラー:", e.message);
+      if (billingSection) billingSection.style.display = "none";
       if (billingArea) billingArea.style.display = "none";
       return;
     }
-
     const hasFree = !!plans.freeAvailable;
     const credits = plans.oneTimeCredits || 0;
     const sub = plans.subscription || { active: false, status: "none" };
     const subActive = !!sub.active;
+
+    // 「初回の託宣は無料」案内は、無料枠が残っている人にだけ表示する
+    setAiLoginNote(hasFree);
+
+    // 無料枠が未使用の一般ユーザーには課金カードを丸ごと隠す（「課金かよ」と思わせない）。
+    if (hasFree) {
+      if (billingSection) billingSection.style.display = "none";
+      if (billingArea) billingArea.style.display = "none";
+      return;
+    }
+    if (billingSection) billingSection.style.display = "block";
 
     // 課金UIは独立セクション（billing-section）なので、ログイン済みなら常に表示する。
     // 中身（残チケット・サブスク状態）は updateBillingStatus が詳細に出す。
@@ -1044,6 +1084,8 @@
 
     // プラン状態の詳細表示（残チケット・サブスク・解約ボタン）
     updateBillingStatus({ plans, hasFree, credits, sub, subActive });
+    // 占う前は折りたたみ、占った後は開く
+    applyBillingFold();
   }
 
   // 「現在のプラン状態」エリアの描画
@@ -1757,6 +1799,10 @@
     btnReset.style.display = "none";
     btnToss.disabled = false;
     btnSkip.disabled = false;
+
+    // 初期画面（占う前）に戻ったので、課金カードは折りたたみ状態に戻す
+    billingUserExpanded = false;
+    applyBillingFold();
   }
 
   // ---------- 認証UI初期化 ----------
@@ -1791,8 +1837,14 @@
           btnLogin.style.display = "none";
           btnLogout.style.display = "inline-block";
           const name = user.user_metadata?.full_name || user.email || "ユーザー";
-          authUser.textContent = `👤 ${name}`;
-          authUser.style.display = "inline-block";
+          authUser.innerHTML = '<svg class="auth-user-icon" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">' +
+            '<circle cx="9" cy="9" r="8.5" fill="#f0ebe0" stroke="#8b7355" stroke-width="0.8"/>' +
+            '<path d="M9 0.5 A8.5 8.5 0 0 1 9 17.5 A4.25 4.25 0 0 1 9 9 A4.25 4.25 0 0 0 9 0.5Z" fill="#3d3028"/>' +
+            '<circle cx="9" cy="4.75" r="1.8" fill="#f0ebe0"/>' +
+            '<circle cx="9" cy="13.25" r="1.8" fill="#3d3028"/>' +
+            '</svg><span class="auth-user-name"></span>';
+          authUser.querySelector(".auth-user-name").textContent = name;
+          authUser.style.display = "inline-flex";
 
           // 同期済みならスキップ（onAuthStateChange と getSession の二重呼び出し対策）
           if (isSyncing) return;

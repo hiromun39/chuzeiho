@@ -58,17 +58,17 @@
         <p>占いたい事柄を記載した後、心を無にし「硬貨を投げる」ボタンを繰り返し6回押してください。<br>
         システムが下（初爻）から上（上爻）に向かって卦を組み立てます。</p>
         <p class="intro-note">※ 気軽に占いたい方は「一気に占う」ボタンで6回分を一度に行えます。</p>
-      </div>
-    </section>
 
-    <!-- ①c スマートフォンでもっと便利に（PWAホーム画面追加導線） -->
-    <section class="section pwa-guide" id="pwa-guide" style="display:none;">
-      <h2 class="collapsible-head" id="pwa-guide-head">スマートフォンでもっと便利に <span class="fold-icon-sm" id="pwa-guide-fold-icon">▾</span></h2>
-      <div id="pwa-guide-body" style="display:none;">
-        <p>ホーム画面に追加すると、アプリのようにワンタップで開けます。下のボタンから追加できます。</p>
-        <div class="pwa-guide-actions">
-          <button id="btn-pwa-install" class="btn btn-secondary" style="display:none;">ホーム画面に追加</button>
-          <button id="btn-pwa-ios" class="btn btn-secondary" style="display:none;">ホーム画面への追加方法を見る</button>
+        <!-- スマートフォンでもっと便利に（PWAホーム画面追加導線・占い方カード内に格納） -->
+        <div class="pwa-inline" id="pwa-guide" style="display:none;">
+          <p class="pwa-inline-head" id="pwa-guide-head">スマートフォンでもっと便利に <span class="fold-icon-sm" id="pwa-guide-fold-icon">▾</span></p>
+          <div id="pwa-guide-body" style="display:none;">
+            <p>ホーム画面に追加すると、アプリのようにワンタップで開けます。下のボタンから追加できます。</p>
+            <div class="pwa-guide-actions">
+              <button id="btn-pwa-install" class="btn btn-secondary" style="display:none;">ホーム画面に追加</button>
+              <button id="btn-pwa-ios" class="btn btn-secondary" style="display:none;">ホーム画面への追加方法を見る</button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -168,7 +168,7 @@
       </p>
       <div class="ai-setting">
         <button id="btn-ai" class="btn btn-ai">式神の託宣を受ける</button>
-        <p class="ai-login-note">※ 初回の託宣は無料です。ログインすると占い結果と合わせて履歴に保存されます。</p>
+        <p class="ai-login-note" id="ai-login-note">※ 初回の託宣は無料です。ログインすると占い結果と合わせて履歴に保存されます。</p>
       </div>
       <div id="ai-credit" class="ai-credit"></div>
 
@@ -186,7 +186,7 @@
 
     <!-- ⑤b 課金・プラン（独立セクション：ログイン中は初期画面でも常に表示） -->
     <section class="section" id="billing-section">
-      <h2>プラン・残チケット</h2>
+      <h2 class="billing-head" id="billing-head"><span id="billing-head-title">プラン・残チケット</span> <span class="fold-icon-sm" id="billing-fold-icon" style="display:none;">▾</span></h2>
       <div id="billing-area" class="billing-area" style="display:none;">
         <h3 class="billing-title">📿 さらに深い鑑定を求める方へ</h3>
         <p class="billing-note">お支払いは Square の安全な決済画面で行います（カード情報がサイトに残ることはありません）。</p>
@@ -231,15 +231,8 @@
     <!-- ⑥ 占い履歴 -->
     <section class="section" id="history-area">
       <h2>占い履歴</h2>
-      <p class="history-note">占った内容は自動的に保存されます。過去の卦とお告げを振り返れます。</p>
+      <p class="history-note">占った内容は自動的に保存されます。過去の卦と式神解釈を振り返れます。</p>
       <div id="history-count" class="history-count"></div>
-      <div class="history-controls">
-        <button id="btn-history" class="btn btn-secondary">履歴を読み込む</button>
-        <button id="btn-export" class="btn btn-secondary">CSVで書き出す</button>
-        <button id="btn-export-json" class="btn btn-secondary">JSONでバックアップ</button>
-        <!-- 全削除ボタンは誤操作防止のため一旦非表示（後日、選択削除などを設計してから復活） -->
-        <button id="btn-clear-all" class="btn btn-reset" style="display:none;">全削除</button>
-      </div>
       <div id="history-list" class="history-list"></div>
 
       <!-- お問い合わせ導線（LINE公式・メイン） -->
@@ -275,7 +268,8 @@
       <span id="mode-switch-label"></span>
       <button id="btn-mode-toggle" class="btn btn-mode">モードを切り替える</button>
     </div>
-    <p class="footer-links"><a href="column/">コラム</a> ｜ <a href="https://onmyoji.theshop.jp" target="_blank" rel="noopener">授与所</a> ｜ <a href="https://lin.ee/ruEvJyi" target="_blank" rel="noopener">お問い合わせ</a> ｜ <a href="privacy.html">プライバシーポリシー</a> ｜ <a href="terms.html">利用規約</a></p>
+    <p class="footer-links"><a href="column/">コラム</a> ｜ <a href="https://onmyoji.theshop.jp" target="_blank" rel="noopener">授与所</a> ｜ <a href="privacy.html">プライバシーポリシー</a> ｜ <a href="terms.html">利用規約</a></p>
+    <p class="footer-contact"><a href="https://lin.ee/ruEvJyi" target="_blank" rel="noopener">お問い合わせ</a></p>
     <p>© 2026 易聖 by 陰陽師・四雲</p>
   </footer>
 </div>
