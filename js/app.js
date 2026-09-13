@@ -46,6 +46,30 @@
   const introAcademic = $("intro-academic");
   const testArea = $("test-area");
 
+  // PWA導線・授与所リンク用DOM
+  const pwaGuide = $("pwa-guide");
+  const pwaGuideHead = $("pwa-guide-head");
+  const pwaGuideBody = $("pwa-guide-body");
+  const pwaGuideFoldIcon = $("pwa-guide-fold-icon");
+  const btnPwaInstall = $("btn-pwa-install");
+  const btnPwaIos = $("btn-pwa-ios");
+  const pwaToast = $("pwa-toast");
+  const pwaToastDismiss = $("pwa-toast-dismiss");
+  const pwaToastInstall = $("pwa-toast-install");
+  const pwaIosModal = $("pwa-ios-modal");
+  const pwaIosClose = $("pwa-ios-close");
+
+  // ---------- アクセス解析（PostHog手動イベント） ----------
+  // autocapture は index.html 側で OFF。ここでは意味のある導線のみを手動発火する。
+  // 未初期化・未ロード時でもアプリを止めないよう必ずガードする。
+  function trackEvent(eventName, props) {
+    try {
+      if (window.posthog && typeof window.posthog.capture === "function") {
+        window.posthog.capture(eventName, props || {});
+      }
+    } catch (e) { /* 解析失敗でアプリを止めない */ }
+  }
+
   // ---------- 状態 ----------
   let values = [];      // 得られた爻値（初爻→上爻）
   let tossCount = 0;    // 投げた回数
@@ -56,6 +80,10 @@
   let isRestoreRender = false;
   // 同一スナップショットの多重復元を防ぐための記録
   let lastRestoreSnapshot = null;
+
+  // PWAインストール（Android Chrome系で beforeinstallprompt を捕捉して保持）
+  let deferredInstallPrompt = null;
+  const PWA_TOAST_KEY = "eki-sen-pwa-toast-shown";
 
   // ---------- モード管理 ----------
   const MODE_KEY = "eki-sen-ui-mode";
@@ -661,6 +689,16 @@
       aiArea.style.display = "block";
       // 画面状態をストレージに保存（決済・ログイン画面への遷移からの復帰用）
       saveDivinationState();
+      // 鑑定結果（本卦・変爻）の表示完了イベント（復元時は発火しない）
+      if (!isRestoreRender) {
+        trackEvent("result_viewed", {
+          mode: "simple",
+          honkaku: c.honkaku ? c.honkaku.name : null,
+          honkaku_n: c.honkaku ? c.honkaku.n : null,
+          henyo_count: c.henyoPositions.length,
+          has_shikaku: !!c.shikaku
+        });
+      }
       return;
     }
 
@@ -748,6 +786,17 @@
 
     // 画面状態をストレージに保存（決済・ログイン画面への遷移からの復帰用）
     saveDivinationState();
+
+    // 鑑定結果（本卦・変爻）の表示完了イベント（復元時は発火しない）
+    if (!isRestoreRender) {
+      trackEvent("result_viewed", {
+        mode: "academic",
+        honkaku: c.honkaku ? c.honkaku.name : null,
+        honkaku_n: c.honkaku ? c.honkaku.n : null,
+        henyo_count: c.henyoPositions.length,
+        has_shikaku: !!c.shikaku
+      });
+    }
   }
 
   // ---------- 画面状態の保存・復元（決済/ログイン/外部タブ遷移からの復帰用） ----------
@@ -922,18 +971,28 @@
     const btnMonthly = $("btn-buy-monthly");
     if (!statusEl) return;
 
+    // 解約予約済みかどうか（/api/plans が subscriptions を参照して返す）
+    const cancelReserved = !!sub.cancelAtPeriodEnd;
+
     let html = "";
     if (subActive) {
       // サブスク有効
       html += `<div class="billing-badge active">✅ 月額プラン有効中（無制限）</div>`;
-      if (sub.currentPeriodEnd) {
-        const d = new Date(sub.currentPeriodEnd);
-        html += `<p class="billing-period">有効期限: ${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}</p>`;
+      // 有効期限（解約予約済みなら、その日まで有効）
+      const periodSrc = sub.currentPeriodEnd || sub.canceledDate;
+      if (periodSrc) {
+        const d = new Date(periodSrc);
+        const periodLabel = cancelReserved ? "有効期限（この日まで利用可能）" : "有効期限";
+        html += `<p class="billing-period">${periodLabel}: ${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}</p>`;
         const today = new Date();
         // 有効期限が過去（start_dateと同値などの過去値）の場合は仮の表示（判定は status で行う）
-        if (d < today) {
+        if (!cancelReserved && d < today) {
           html += `<p class="billing-period-sub">※ 有効期限は次回更新日(Square)から反映されます。無制限でご利用いただけます。</p>`;
         }
+      }
+      // 解約予約済みの場合は、その旨を明示する（解約ボタンは出さない）
+      if (cancelReserved) {
+        html += `<div class="billing-badge reserved">🔔 解約を予約済み（期間満了まで無制限でご利用いただけます）</div>`;
       }
       // サブスク有効中でも保有チケット（失われない）を併記して、ユーザーに安心を与える
       if (credits > 0) {
@@ -941,9 +1000,13 @@
       }
     } else {
       if (hasFree) {
+        // 初回無料が残っている人には「0枚」を出さない（無料バッジのみで十分）。
         html += `<div class="billing-badge free">🎴 初回の託宣は無料（未使用）</div>`;
-      }
-      if (credits > 0) {
+        if (credits > 0) {
+          html += `<div class="billing-badge credit">🎫 残チケット: ${credits} 枚</div>`;
+        }
+      } else {
+        // 初回無料を使い切った人には、残数が0でも常時表示する（現在の枚数が分かるように）。
         html += `<div class="billing-badge credit">🎫 残チケット: ${credits} 枚</div>`;
       }
       if (sub.status && sub.status !== "none" && (sub.status.toLowerCase() !== "active")) {
@@ -951,12 +1014,14 @@
       }
     }
 
-    // サブスク有効時は購入ボタンを無効化し、解約ボタンを出す
+    // サブスク有効時は購入ボタンを無効化し、解約ボタンを出す（解約予約済みなら出さない）
     if (subActive) {
       if (btnSingle) { btnSingle.disabled = true; btnSingle.textContent = "サブスク利用中"; }
       if (btnMonthly) { btnMonthly.disabled = true; btnMonthly.textContent = "登録済み"; }
-      // 解約ボタン（動的）
-      html += `<button id="btn-cancel-sub" class="btn btn-cancel">サブスクを解約する</button>`;
+      // 解約ボタン（動的）。既に解約予約済みなら出さない。
+      if (!cancelReserved) {
+        html += `<button id="btn-cancel-sub" class="btn btn-cancel">サブスクを解約する</button>`;
+      }
     } else {
       if (btnSingle) { btnSingle.disabled = false; btnSingle.textContent = "500円で購入"; }
       if (btnMonthly) { btnMonthly.disabled = false; btnMonthly.textContent = "月額2,980円に登録"; }
@@ -1046,8 +1111,13 @@
     try {
       const result = await window.AppSupabase.cancelSubscription();
       aiOutput.innerHTML = `<p class="hint">✅ ${result.message || "解約を予約しました。"}</p>`;
-      // 状態を再取得
-      updateAICreditDisplay();
+      // 状態を再取得して、プラン欄（解約予約済み表示）へ即時反映する。
+      // ※ 従来は await していなかったため、再取得完了前に処理が進み表示が変わらないことがあった（2026/9/13 修正）。
+      try {
+        await updateAICreditDisplay();
+      } catch (e2) {
+        console.error("解約後のプラン表示更新エラー:", e2.message);
+      }
     } catch (e) {
       aiOutput.innerHTML = `<p class="ai-error">⚠️ ${e.message}</p>`;
     }
@@ -1155,6 +1225,14 @@
       }
 
       const payload = buildAIRequestPayload();
+      // 占い実行イベント（式神託宣の要求時点。本卦・変爻などをプロパティに含める）
+      trackEvent("shikigami_executed", {
+        honkaku: payload.honkaku ? payload.honkaku.name : null,
+        honkaku_n: payload.honkaku ? payload.honkaku.n : null,
+        shikaku: payload.shikaku ? payload.shikaku.name : null,
+        henyo_count: Array.isArray(payload.henIndex) ? payload.henIndex.length : 0,
+        has_fortune: !!payload.fortune
+      });
       const response = await callAIWorker(accessToken, payload);
 
       // AI解釈を履歴に保存
@@ -1169,6 +1247,8 @@
       //    残チケットを最新化する（従来はページ再表示まで更新されず「減らない」ように見えた）
       try { await updateAICreditDisplay(); } catch (e) { console.error("残チケット表示更新エラー:", e.message); }
       aiOutput.scrollIntoView({ behavior: "smooth", block: "start" });
+      // 式神託宣の初回表示直後に、PWAホーム画面追加トーストを一度だけ出す
+      showPwaToastOnce();
     } catch (err) {
       if (err.code === "PAYMENT_REQUIRED") {
         aiOutput.innerHTML = `<p class="ai-error">⚠️ ${err.message}</p>`;
@@ -1277,6 +1357,124 @@
   // ---------- AIエリア初期化 ----------
   function initAIArea() {
     updateAICreditDisplay();
+  }
+
+  // ---------- PWA導線（ホーム画面追加） ----------
+  // standalone（既にホーム画面アプリとして起動中）かどうか
+  function isStandalone() {
+    try {
+      return window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true;
+    } catch (e) { return false; }
+  }
+
+  // iOS（Safari）かどうか。beforeinstallprompt が存在しない環境。
+  function isIOS() {
+    const ua = window.navigator.userAgent || "";
+    return /iPad|iPhone|iPod/.test(ua);
+  }
+
+  function openPwaIosModal() {
+    if (pwaIosModal) pwaIosModal.style.display = "flex";
+  }
+  function closePwaIosModal() {
+    if (pwaIosModal) pwaIosModal.style.display = "none";
+  }
+
+  // ホーム画面追加ボタン：Androidはネイティブダイアログ、iOSは手順モーダル
+  async function onPwaInstallClick() {
+    trackEvent("pwa_install_prompt_clicked", {
+      platform: deferredInstallPrompt ? "android" : (isIOS() ? "ios" : "other")
+    });
+    if (deferredInstallPrompt) {
+      try {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+      } catch (e) {}
+      deferredInstallPrompt = null;
+      return;
+    }
+    if (isIOS()) openPwaIosModal();
+  }
+
+  // トーストを一度だけ表示（localStorage フラグで再表示を抑止）
+  function showPwaToastOnce() {
+    try {
+      if (isStandalone()) return;                              // 既にPWA起動中は出さない
+      if (localStorage.getItem(PWA_TOAST_KEY) === "1") return; // 表示済みなら出さない
+    } catch (e) {}
+    if (!pwaToast) return;
+    pwaToast.style.display = "block";
+  }
+
+  function dismissPwaToast() {
+    if (pwaToast) pwaToast.style.display = "none";
+    try { localStorage.setItem(PWA_TOAST_KEY, "1"); } catch (e) {}
+  }
+
+  // PWA導線の初期化（アコーディオン・ボタン・モーダル・外部リンク計測）
+  function initPwa() {
+    // アコーディオンの表示可否：既にstandaloneなら導線自体を出さない
+    if (pwaGuide) pwaGuide.style.display = isStandalone() ? "none" : "block";
+
+    // アコーディオン開閉（占い方と同じ方式）
+    if (pwaGuideHead && pwaGuideBody) {
+      pwaGuideHead.addEventListener("click", () => {
+        const hidden = pwaGuideBody.style.display === "none";
+        pwaGuideBody.style.display = hidden ? "block" : "none";
+        if (pwaGuideFoldIcon) pwaGuideFoldIcon.classList.toggle("open", hidden);
+      });
+    }
+
+    // Android Chrome系：beforeinstallprompt を捕捉して独自ボタンを出す
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      if (btnPwaInstall) btnPwaInstall.style.display = "inline-block";
+      if (btnPwaIos) btnPwaIos.style.display = "none";
+    });
+
+    // iOS：beforeinstallprompt が無いので手順案内ボタンを出す
+    if (isIOS() && btnPwaIos) {
+      btnPwaIos.style.display = "inline-block";
+    }
+
+    if (btnPwaInstall) btnPwaInstall.addEventListener("click", onPwaInstallClick);
+    if (btnPwaIos) {
+      btnPwaIos.addEventListener("click", () => {
+        trackEvent("pwa_install_prompt_clicked", { platform: "ios" });
+        openPwaIosModal();
+      });
+    }
+    if (pwaIosClose) pwaIosClose.addEventListener("click", closePwaIosModal);
+    if (pwaIosModal) {
+      pwaIosModal.addEventListener("click", (e) => {
+        if (e.target === pwaIosModal) closePwaIosModal();
+      });
+    }
+
+    // トーストのボタン
+    if (pwaToastDismiss) pwaToastDismiss.addEventListener("click", dismissPwaToast);
+    if (pwaToastInstall) {
+      pwaToastInstall.addEventListener("click", () => {
+        dismissPwaToast();
+        onPwaInstallClick();
+      });
+    }
+
+    // 授与所リンク（外部）クリックの記録
+    const offeringLink = $("offering-link");
+    if (offeringLink) {
+      offeringLink.addEventListener("click", () => {
+        trackEvent("external_link_clicked", { target: "offering", url: offeringLink.href });
+      });
+    }
+    // フッターの外部リンク（授与所）も同様に記録
+    document.querySelectorAll('.footer-links a[target="_blank"]').forEach(a => {
+      a.addEventListener("click", () => {
+        trackEvent("external_link_clicked", { target: "footer", url: a.href });
+      });
+    });
   }
 
   // ---------- JSONバックアップ ----------
@@ -1647,6 +1845,7 @@
       try { initTestArea(); } catch (e) { console.error("initTestArea:", e); }
       try { initHistoryArea(); } catch (e) { console.error("initHistoryArea:", e); }
       try { initAIArea(); } catch (e) { console.error("initAIArea:", e); }
+      try { initPwa(); } catch (e) { console.error("initPwa:", e); }
 
       // 決済からの復帰（?paid=1）処理。
       // Squareから戻ってきた時は、初期画面ではなく「占い結果画面」を表示するのが正しい導線。

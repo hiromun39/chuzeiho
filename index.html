@@ -12,6 +12,25 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="中筮法">
 <link rel="stylesheet" href="css/style.css">
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-X71DR41NBW"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-X71DR41NBW');
+</script>
+<!-- PostHog（autocapture OFF・個人追跡なし・Cookieバナーなし。APIキーは後で差し替え） -->
+<script>
+  !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,o){var e=o.split(".");2==e.length&&(t=t[e[0]],o=e[1]),t[o]=function(){t.push([o].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+  window.posthog.init('phc_wuakhVmkPrZ3UHiCspZoGCd3ScBCLNYbZRia9NgAR5gz', {
+    api_host: 'https://us.i.posthog.com',
+    autocapture: false,
+    capture_pageview: true,
+    person_profiles: 'never',
+    disable_session_recording: true
+  });
+</script>
 </head>
 <body>
 <div class="container">
@@ -39,6 +58,18 @@
         <p>占いたい事柄を記載した後、心を無にし「硬貨を投げる」ボタンを繰り返し6回押してください。<br>
         システムが下（初爻）から上（上爻）に向かって卦を組み立てます。</p>
         <p class="intro-note">※ 気軽に占いたい方は「一気に占う」ボタンで6回分を一度に行えます。</p>
+      </div>
+    </section>
+
+    <!-- ①c スマートフォンでもっと便利に（PWAホーム画面追加導線） -->
+    <section class="section pwa-guide" id="pwa-guide" style="display:none;">
+      <h2 class="collapsible-head" id="pwa-guide-head">スマートフォンでもっと便利に <span class="fold-icon-sm" id="pwa-guide-fold-icon">▾</span></h2>
+      <div id="pwa-guide-body" style="display:none;">
+        <p>ホーム画面に追加すると、アプリのようにワンタップで開けます。下のボタンから追加できます。</p>
+        <div class="pwa-guide-actions">
+          <button id="btn-pwa-install" class="btn btn-secondary" style="display:none;">ホーム画面に追加</button>
+          <button id="btn-pwa-ios" class="btn btn-secondary" style="display:none;">ホーム画面への追加方法を見る</button>
+        </div>
       </div>
     </section>
 
@@ -145,6 +176,12 @@
       <div class="ai-output" id="ai-output">
         <p class="hint">🎴 占いが完了すると、ここに式神の託宣が表示されます。</p>
       </div>
+
+      <!-- ② 授与所への汎用リンク（式神託宣の直下・常時表示。将来は本卦タグで出し分け予定） -->
+      <div id="offering-link-card" class="offering-link-card">
+        <p class="offering-link-copy">更なる加護を求める方は、授与所にてお守りをお求めいただけます。</p>
+        <a id="offering-link" class="offering-link" href="https://onmyoji.theshop.jp" target="_blank" rel="noopener">授与所を見る →</a>
+      </div>
     </section>
 
     <!-- ⑤b 課金・プラン（独立セクション：ログイン中は初期画面でも常に表示） -->
@@ -228,9 +265,37 @@
       <span id="mode-switch-label"></span>
       <button id="btn-mode-toggle" class="btn btn-mode">モードを切り替える</button>
     </div>
-    <p class="footer-links"><a href="privacy.html">プライバシーポリシー</a> ｜ <a href="terms.html">利用規約</a></p>
+    <p class="footer-links"><a href="column/">コラム</a> ｜ <a href="https://onmyoji.theshop.jp" target="_blank" rel="noopener">授与所</a> ｜ <a href="privacy.html">プライバシーポリシー</a> ｜ <a href="terms.html">利用規約</a></p>
     <p>© 2026 易聖 by 陰陽師・四雲</p>
   </footer>
+</div>
+
+<!-- PWA追加トースト（式神託宣の初回表示直後に一度だけ表示） -->
+<div id="pwa-toast" class="pwa-toast" style="display:none;" role="dialog" aria-live="polite">
+  <div class="pwa-toast-inner">
+    <p class="pwa-toast-title">式神の託宣、お受け取りいただけましたか</p>
+    <p class="pwa-toast-body">この易聖をお守りとしてホーム画面に。次はワンタップで開けます。</p>
+    <div class="pwa-toast-actions">
+      <button id="pwa-toast-dismiss" class="btn btn-secondary">今はしない</button>
+      <button id="pwa-toast-install" class="btn btn-buy">ホーム画面に追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- iOS用：ホーム画面追加手順モーダル -->
+<div id="pwa-ios-modal" class="square-modal-overlay" style="display:none;">
+  <div class="square-modal">
+    <h3 class="square-modal-title">ホーム画面に追加</h3>
+    <p class="square-modal-note">Safari の画面下部（または上部）にある共有ボタン <span class="pwa-share-icon">⬆︎</span> をタップし、「ホーム画面に追加」を選んでください。</p>
+    <ol class="pwa-ios-steps">
+      <li>共有ボタン（□に↑）をタップ</li>
+      <li>メニューから「ホーム画面に追加」を選択</li>
+      <li>右上の「追加」をタップ</li>
+    </ol>
+    <div class="square-modal-actions">
+      <button id="pwa-ios-close" class="btn btn-secondary">閉じる</button>
+    </div>
+  </div>
 </div>
 
 <!-- スクリプト読み込み -->
