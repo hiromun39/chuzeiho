@@ -2053,6 +2053,18 @@
     if (btnBuySingle) { try { btnBuySingle.addEventListener("click", onBuySingle); } catch (e) {} }
     if (btnBuyMonthly) { try { btnBuyMonthly.addEventListener("click", onBuyMonthly); } catch (e) {} }
 
+    // 課金カード見出しのタップで折りたたみを開閉する（占う前のみ）
+    const billingHead = $("billing-head");
+    if (billingHead) {
+      try {
+        billingHead.addEventListener("click", () => {
+          if (isDivinationShown()) return; // 占った後は開いたまま（操作無効）
+          billingUserExpanded = !billingUserExpanded;
+          applyBillingFold();
+        });
+      } catch (e) {}
+    }
+
     // ページ再表示（ブラウザバック・bfcache復元・タブ復元）時に、ログイン済みなら
     // プラン状態（残チケット等）を再取得して表示を最新化する。
     // Square決済後に「戻るボタン」で戻った場合、URLに ?paid=1 が付かないため、
