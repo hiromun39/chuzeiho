@@ -224,7 +224,7 @@
       }
     },
 
-    // 履歴をDBで更新（AI解釈追記など）
+    // 履歴をDBで更新（式神解釈追記など）
     async updateHistory(ts, patch) {
       if (!supabase || !currentUser) return false;
       const updates = {};

@@ -1516,6 +1516,55 @@ body {
   margin-bottom: 10px;
 }
 
+/* ---------- 式神解釈の折りたたみ（履歴） ---------- */
+/* 履歴では式神解釈を初期状態で畳んでおき、必要な時だけ開けるようにする。 */
+.history-ai-fold {
+  margin-top: 6px;
+}
+.history-ai-fold > summary {
+  display: inline-block;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--shu);
+  background: #fdf6f2;
+  border: 1px solid #f0dcd2;
+  border-radius: 4px;
+  padding: 3px 10px;
+  list-style: none;
+  user-select: none;
+}
+.history-ai-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.history-ai-fold > summary::before {
+  content: "▸ ";
+}
+.history-ai-fold[open] > summary::before {
+  content: "▾ ";
+}
+.history-ai-fold > summary:hover {
+  border-color: var(--shu);
+}
+
+/* ---------- 鑑定の再表示ボタン（履歴） ---------- */
+.history-replay-btn {
+  display: inline-block;
+  margin-top: 8px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--shu);
+  background: #fff;
+  border: 1px solid var(--shu);
+  border-radius: 6px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.history-replay-btn:hover {
+  background: var(--shu);
+  color: #fff;
+}
+
 .history-ai {
   font-size: 0.85rem;
   color: var(--text);
@@ -1966,5 +2015,60 @@ body {
 }
 .column-back-link a:hover {
   text-decoration: underline;
+}
+
+/* =========================================
+   お問い合わせ導線（LINE公式）
+   ========================================= */
+.contact-line-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: #f7fdf9;
+  border: 1px solid #c7e9d6;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.contact-line-card:hover {
+  border-color: #06C755;
+  box-shadow: 0 3px 12px rgba(6, 199, 85, 0.15);
+}
+.contact-line-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #06C755;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+.contact-line-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.contact-line-main {
+  font-size: 0.98rem;
+  font-weight: bold;
+  color: var(--sumi);
+  line-height: 1.5;
+}
+.contact-line-sub {
+  font-size: 0.82rem;
+  color: var(--text-sub);
+}
+.contact-line-arrow {
+  flex-shrink: 0;
+  color: #06C755;
+  font-weight: bold;
+  font-size: 1.1rem;
 }
 

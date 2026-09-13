@@ -193,7 +193,7 @@
     }
   }
 
-  // ---------- 履歴更新（AI解釈などを後から追記） ----------
+  // ---------- 履歴更新（式神解釈などを後から追記） ----------
   function updateHistory(ts, patch) {
     try {
       const history = getHistory();
@@ -212,7 +212,7 @@
     }
   }
 
-  // ---------- AI解釈を履歴に保存（2000字で打ち切り） ----------
+  // ---------- 式神解釈を履歴に保存（2000字で打ち切り） ----------
   function saveAIResult(aiText, aiMode) {
     if (!lastResult || !lastResult.ts) return;
     const trimmed = String(aiText || "").slice(0, 2000);
@@ -258,7 +258,11 @@
       const d = new Date(h.ts);
       const dateStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       const fortune = h.fortune ? `<div class="history-fortune">${h.fortune}</div>` : "";
-      const aiText = h.aiText ? '<div class="history-ai"><b>AI解釈</b><br>' + h.aiText.replace(/&/g, escAmp).replace(/</g, escLt).replace(/>/g, escGt) + '</div>' : "";
+      // 式神解釈は折りたたみ表示（初期は閉じる）。卦辞・占的などはそのまま表示。
+      const aiText = h.aiText ? '<details class="history-ai-fold"><summary>式神解釈を見る</summary><div class="history-ai">' + h.aiText.replace(/&/g, escAmp).replace(/</g, escLt).replace(/>/g, escGt) + '</div></details>' : "";
+
+      // 鑑定の再表示ボタン（保存済みデータから占い結果画面を無料で復元する。APIは叩かない）
+      const replayBtn = h.honkaku ? `<button type="button" class="history-replay-btn" data-ts="${h.ts}">🔮 この鑑定をもう一度見る</button>` : "";
 
       // 変爻位置ラベル（例: "上、五、初爻変"）。変爻なしなら空文字
       const henyoLabel = formatHenyoLabel(h.henyo);
@@ -279,6 +283,7 @@
               <div class="history-kua-simple">${honName}${shiName}</div>
               ${fortune}
               ${aiText}
+              ${replayBtn}
             </div>
           </div>
         `;
@@ -295,12 +300,89 @@
             <div class="history-kua">本卦 ${hon}${henyoSeg}${h.henyo && h.henyo.length > 0 ? `／ 之卦 ${shi}` : ""}</div>
             ${fortune}
             ${aiText}
+            ${replayBtn}
           </div>
         </div>
       `;
     }).join("");
 
     container.innerHTML = rows;
+
+    // 鑑定の再表示ボタンにイベントを付与（data-ts で該当履歴を特定）
+    container.querySelectorAll(".history-replay-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const ts = btn.getAttribute("data-ts");
+        const rec = getHistory().find(h => h.ts === ts);
+        if (rec) replayHistory(rec);
+      });
+    });
+  }
+
+  // ---------- 履歴レコードから爻値（values）を復元 ----------
+  // 履歴には honkaku.n（本卦番号）・shikaku.n（之卦番号）・henyo（変爻位置）が保存されている。
+  // R64 の各卦には shape（6桁・初爻→上爻の 0/1）が定義されているので、本卦の shape と
+  // 変爻位置を突き合わせれば、各爻値を一意に逆算できる（爻値は履歴に保存されていないため）。
+  //   shape=1 かつ 変爻 → 9（老陽） / shape=1 かつ 非変爻 → 7（少陽）
+  //   shape=0 かつ 変爻 → 6（老陰） / shape=0 かつ 非変爻 → 8（少陰）
+  function valuesFromHistory(h) {
+    if (!h || !h.honkaku || !h.honkaku.n) return null;
+    const kua = R64.kua.find(k => k.n === h.honkaku.n);
+    if (!kua || !kua.shape) return null;
+    const henyo = Array.isArray(h.henyo) ? h.henyo : [];
+    const shape = kua.shape;
+    const vals = [];
+    for (let i = 0; i < 6; i++) {
+      const isYang = shape[i] === "1";
+      const isHen = henyo.includes(i + 1);
+      if (isYang) vals.push(isHen ? 9 : 7);
+      else vals.push(isHen ? 6 : 8);
+    }
+    return vals;
+  }
+
+  // ---------- 履歴レコードから「鑑定をもう一度見る」 ----------
+  // 保存済みデータのみで占い結果画面を再構築する（DeepSeek API は叩かない＝チケット消費なし）。
+  // showResult は isRestoreRender=true の間 saveHistory をスキップするため、履歴は重複しない。
+  function replayHistory(h) {
+    const vals = valuesFromHistory(h);
+    if (!vals) {
+      alert("この鑑定は再表示できませんでした（データ不足）。");
+      return;
+    }
+
+    // 途中の復元スナップショットが残っていれば破棄（新しい表示で上書きするため）
+    try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+    try { localStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
+
+    // 爻値・占的・式神解釈をセットして結果画面を再構築
+    values = vals;
+    tossCount = 6;
+    if (fortuneText && h.fortune) {
+      fortuneText.value = h.fortune;
+      try { updateCount(); } catch (e) {}
+    }
+    lastAIText = h.aiText || null;
+
+    isRestoreRender = true;
+    try {
+      showResult();
+    } finally {
+      isRestoreRender = false;
+    }
+
+    // 式神解釈を再表示（保存されていれば）。無ければ前回表示をクリアする。
+    if (aiOutput) {
+      aiOutput.innerHTML = h.aiText ? renderAIResponse(h.aiText) : "";
+    }
+
+    // 結果エリアまでスクロール
+    setTimeout(() => {
+      if (resultAreaSimple && resultAreaSimple.style.display === "block") {
+        resultAreaSimple.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (resultArea) {
+        resultArea.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 300);
   }
 
   // ---------- CSVエクスポート ----------
@@ -312,7 +394,7 @@
     }
 
     // BOM付きCSV（Excelで文字化けしないように）
-    const header = "日時,占的,本卦,本卦番号,之卦,之卦番号,変爻,卦辞,AI解釈\n";
+    const header = "日時,占的,本卦,本卦番号,之卦,之卦番号,変爻,卦辞,式神解釈\n";
     const rows = history.map(h => {
       const d = new Date(h.ts);
       const dateStr = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -1235,7 +1317,7 @@
       });
       const response = await callAIWorker(accessToken, payload);
 
-      // AI解釈を履歴に保存
+      // 式神解釈を履歴に保存
       saveAIResult(response, "ai");
       // 式神解釈をメモリ変数に保持（決済遷移のスナップショット保存用）
       lastAIText = response;
