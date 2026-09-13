@@ -53,11 +53,14 @@
   const pwaGuideFoldIcon = $("pwa-guide-fold-icon");
   const btnPwaInstall = $("btn-pwa-install");
   const btnPwaIos = $("btn-pwa-ios");
+  const btnPwaAndroid = $("btn-pwa-android");
   const pwaToast = $("pwa-toast");
   const pwaToastDismiss = $("pwa-toast-dismiss");
   const pwaToastInstall = $("pwa-toast-install");
   const pwaIosModal = $("pwa-ios-modal");
   const pwaIosClose = $("pwa-ios-close");
+  const pwaAndroidModal = $("pwa-android-modal");
+  const pwaAndroidClose = $("pwa-android-close");
 
   // ---------- アクセス解析（PostHog手動イベント） ----------
   // autocapture は index.html 側で OFF。ここでは意味のある導線のみを手動発火する。
@@ -1505,6 +1508,13 @@
     if (pwaIosModal) pwaIosModal.style.display = "none";
   }
 
+  function openPwaAndroidModal() {
+    if (pwaAndroidModal) pwaAndroidModal.style.display = "flex";
+  }
+  function closePwaAndroidModal() {
+    if (pwaAndroidModal) pwaAndroidModal.style.display = "none";
+  }
+
   // ホーム画面追加ボタン：Androidはネイティブダイアログ、iOSは手順モーダル
   async function onPwaInstallClick() {
     trackEvent("pwa_install_prompt_clicked", {
@@ -1518,7 +1528,10 @@
       deferredInstallPrompt = null;
       return;
     }
+    // iOS は Safari共有からの手順、それ以外（beforeinstallprompt 非対応のAndroid等）は
+    // 汎用の手順モーダルを開く（ボタンが出ない機種でも無反応にしない）
     if (isIOS()) openPwaIosModal();
+    else openPwaAndroidModal();
   }
 
   // トーストを一度だけ表示（localStorage フラグで再表示を抑止）
@@ -1556,11 +1569,16 @@
       deferredInstallPrompt = e;
       if (btnPwaInstall) btnPwaInstall.style.display = "inline-block";
       if (btnPwaIos) btnPwaIos.style.display = "none";
+      if (btnPwaAndroid) btnPwaAndroid.style.display = "none"; // ネイティブ導線が使えるので案内は不要
     });
 
     // iOS：beforeinstallprompt が無いので手順案内ボタンを出す
     if (isIOS() && btnPwaIos) {
       btnPwaIos.style.display = "inline-block";
+    } else if (!isIOS() && btnPwaAndroid) {
+      // iOS以外（Android系）は、beforeinstallprompt が来るまでは汎用手順ボタンを出しておく。
+      // 発火したら上のハンドラでネイティブボタンに差し替わる（OPPO等の非対応ブラウザでも導線が消えない）。
+      btnPwaAndroid.style.display = "inline-block";
     }
 
     if (btnPwaInstall) btnPwaInstall.addEventListener("click", onPwaInstallClick);
@@ -1574,6 +1592,20 @@
     if (pwaIosModal) {
       pwaIosModal.addEventListener("click", (e) => {
         if (e.target === pwaIosModal) closePwaIosModal();
+      });
+    }
+
+    // Android向け：汎用手順ボタン・モーダル閉じる
+    if (btnPwaAndroid) {
+      btnPwaAndroid.addEventListener("click", () => {
+        trackEvent("pwa_install_prompt_clicked", { platform: "android_manual" });
+        openPwaAndroidModal();
+      });
+    }
+    if (pwaAndroidClose) pwaAndroidClose.addEventListener("click", closePwaAndroidModal);
+    if (pwaAndroidModal) {
+      pwaAndroidModal.addEventListener("click", (e) => {
+        if (e.target === pwaAndroidModal) closePwaAndroidModal();
       });
     }
 
