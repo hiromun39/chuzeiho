@@ -52,7 +52,8 @@
       if (!supabase) return null;
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin + window.location.pathname }
+        // 戻り先に ?fromAuth=1 を付け、ログイン復帰時に占い結果を復元できるようにする
+        options: { redirectTo: window.location.origin + window.location.pathname + "?fromAuth=1" }
       });
       if (error) console.error("Googleログインエラー:", error.message);
       return data;

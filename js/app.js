@@ -1848,6 +1848,10 @@
     // ログインボタン
     btnLogin.addEventListener("click", async () => {
       if (window.AppSupabase) {
+        // Google認証でページを離れる前に、占い結果（values・占的）を保存しておく。
+        // 戻り時（?fromAuth=1）に復元され、占い結果を捨てずにログイン後の式神託宣へ進める。
+        // ※ showResult() 時点で保存済みだが、離脱直前の再保存で確実性を上げる。
+        try { saveDivinationState(); } catch (e) {}
         await window.AppSupabase.signInWithGoogle();
       }
     });
@@ -2022,11 +2026,14 @@
       // を順序保証して行う。両者は別DOM領域への操作なので共存できる。
       // Square 決済のリダイレクト（redirect_url=?paid=1）からの復帰時のみ、直前の占い状態を復元する。
       // ※ F5・新タブ・直接URLなどの通常アクセスでは絶対に復元しない（古い占いが固着するのを防ぐ）。
-      if (params.get("paid") === "1") {
-        // ?paid=1 を URL から除去し、リロードで再発火しないようにする
+      const isPaidReturn = params.get("paid") === "1";       // Square決済からの復帰
+      const isAuthReturn = params.get("fromAuth") === "1";   // Googleログインからの復帰
+      if (isPaidReturn || isAuthReturn) {
+        // 復帰フラグを URL から除去し、リロードで再発火しないようにする
         try {
           const url = new URL(window.location.href);
           url.searchParams.delete("paid");
+          url.searchParams.delete("fromAuth");
           history.replaceState(null, "", url.toString());
         } catch (e) {}
 
