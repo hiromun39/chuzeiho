@@ -4,7 +4,7 @@
    - アプリ更新時のキャッシュ更新
    ========================================= */
 
-const CACHE_NAME = "chuzeiho-v2";
+const CACHE_NAME = "chuzeiho-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",
