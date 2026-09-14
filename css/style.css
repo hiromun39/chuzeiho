@@ -169,6 +169,61 @@ body {
   opacity: 0.7;
 }
 
+/* 未ログイン時：ログインボタン＋安心マイクロコピー（Google連携の心理障壁軽減） */
+.auth-login-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.auth-login-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  color: #2d6a4f;
+  border-bottom: 1px solid rgba(45, 106, 79, 0.22);
+  padding-bottom: 1px;
+  line-height: 1.4;
+}
+
+.auth-login-note-lock {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.auth-login-detail {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  max-width: 240px;
+  background: rgba(45, 106, 79, 0.07);
+  border: 1px solid rgba(45, 106, 79, 0.22);
+  border-radius: 3px;
+  padding: 9px 11px;
+  text-align: left;
+}
+
+.auth-login-detail-lock {
+  font-size: 13px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.auth-login-detail-title {
+  font-size: 10.5px;
+  color: #2d6a4f;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.auth-login-detail-text {
+  font-size: 10px;
+  color: #3d5a4c;
+  line-height: 1.7;
+}
+
 /* ---------- データステータス ---------- */
 .data-status {
   text-align: center;

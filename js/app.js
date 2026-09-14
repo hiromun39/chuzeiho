@@ -1842,6 +1842,7 @@
     const btnLogin = $("btn-login");
     const btnLogout = $("btn-logout");
     const authUser = $("auth-user");
+    const authLoginBox = $("auth-login-box");
     if (!btnLogin || !btnLogout || !authUser) return;
 
     // ログインボタン
@@ -1867,6 +1868,7 @@
         if (user) {
           // ログイン済み
           btnLogin.style.display = "none";
+          if (authLoginBox) authLoginBox.style.display = "none"; // 未ログイン用の安心マイクロコピーを隠す
           btnLogout.style.display = "inline-block";
           const name = user.user_metadata?.full_name || user.email || "ユーザー";
           authUser.innerHTML = '<svg class="auth-user-icon" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">' +
@@ -1894,6 +1896,7 @@
           updateAICreditDisplay();
         } else {
           // 未ログイン
+          if (authLoginBox) authLoginBox.style.display = "flex"; // 安心マイクロコピーを表示
           btnLogin.style.display = "inline-block";
           btnLogout.style.display = "none";
           authUser.style.display = "none";

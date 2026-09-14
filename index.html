@@ -43,7 +43,20 @@
     </div>
     <div class="auth-area">
       <div id="auth-user" class="auth-user" style="display:none;"></div>
-      <button id="btn-login" class="btn btn-auth" style="display:none;">ログイン</button>
+      <div id="auth-login-box" class="auth-login-box" style="display:none;">
+        <button id="btn-login" class="btn btn-auth">ログイン</button>
+        <div class="auth-login-note">
+          <span class="auth-login-note-lock" aria-hidden="true">🔒</span>
+          <span>鑑定履歴の保存のみに使用</span>
+        </div>
+        <div class="auth-login-detail">
+          <span class="auth-login-detail-lock" aria-hidden="true">🔒</span>
+          <div>
+            <div class="auth-login-detail-title">お客様の情報は厳重に保護されます</div>
+            <div class="auth-login-detail-text">Googleアカウントは「鑑定履歴の保存」のみに使用します。外部への公開・不要なメールの送信は一切行いません。</div>
+          </div>
+        </div>
+      </div>
       <button id="btn-logout" class="btn btn-auth-out" style="display:none;">ログアウト</button>
     </div>
   </header>
