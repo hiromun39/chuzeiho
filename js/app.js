@@ -1137,7 +1137,16 @@
         html += `<div class="billing-badge credit">🎫 残チケット: ${credits} 枚</div>`;
       }
       if (sub.status && sub.status !== "none" && (sub.status.toLowerCase() !== "active")) {
-        html += `<div class="billing-badge">💳 サブスク状態: ${sub.status}</div>`;
+        const st = String(sub.status).toLowerCase();
+        let stLabel;
+        if (st === "canceled" || st === "cancelled") {
+          stLabel = "月額プランは終了しました（残りチケットはご利用いただけます）";
+        } else if (st === "past_due" || st === "delinquent") {
+          stLabel = "お支払いを確認できませんでした";
+        } else {
+          stLabel = `サブスク状態: ${sub.status}`;
+        }
+        html += `<div class="billing-badge">💳 ${stLabel}</div>`;
       }
     }
 
@@ -1235,9 +1244,23 @@
   // サブスク解約
   async function onCancelSubscription() {
     if (!confirm("サブスクを解約しますか？期間満了日までご利用いただけます。")) return;
+    // 結果メッセージは占い結果（aiOutput）ではなく、課金欄の直下に出す。
+    const showCancelMsg = (cls, text) => {
+      const statusEl = $("billing-status");
+      if (!statusEl) return;
+      let msgEl = $("cancel-msg");
+      if (!msgEl) {
+        msgEl = document.createElement("div");
+        msgEl.id = "cancel-msg";
+        statusEl.insertAdjacentElement("afterend", msgEl);
+      }
+      msgEl.innerHTML = `<p class="${cls}"></p>`;
+      msgEl.firstChild.textContent = text;
+    };
+    const cancelBtnEl = $("btn-cancel-sub");
+    if (cancelBtnEl) cancelBtnEl.disabled = true;
     try {
       const result = await window.AppSupabase.cancelSubscription();
-      aiOutput.innerHTML = `<p class="hint">✅ ${result.message || "解約を予約しました。"}</p>`;
       // 状態を再取得して、プラン欄（解約予約済み表示）へ即時反映する。
       // ※ 従来は await していなかったため、再取得完了前に処理が進み表示が変わらないことがあった（2026/9/13 修正）。
       try {
@@ -1245,8 +1268,11 @@
       } catch (e2) {
         console.error("解約後のプラン表示更新エラー:", e2.message);
       }
+      showCancelMsg("hint", `✅ ${result.message || "解約を予約しました。"}`);
     } catch (e) {
-      aiOutput.innerHTML = `<p class="ai-error">⚠️ ${e.message}</p>`;
+      const again = $("btn-cancel-sub");
+      if (again) again.disabled = false;
+      showCancelMsg("ai-error", `⚠️ 解約を受け付けられませんでした。時間をおいても改善しない場合は公式LINEへご連絡ください（${e.message}）`);
     }
   }
 
