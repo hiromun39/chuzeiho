@@ -1272,7 +1272,8 @@
     } catch (e) {
       const again = $("btn-cancel-sub");
       if (again) again.disabled = false;
-      showCancelMsg("ai-error", `⚠️ 解約を受け付けられませんでした。時間をおいても改善しない場合は公式LINEへご連絡ください（${e.message}）`);
+      console.error("[cancel]", e);
+      showCancelMsg("ai-error", "⚠️ 解約を受け付けられませんでした。時間をおいても改善しない場合は公式LINEへご連絡ください");
     }
   }
 
