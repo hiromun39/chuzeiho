@@ -1896,6 +1896,7 @@
       // 同期の二重実行防止フラグ
       let isSyncing = false;
       window.AppSupabase.init(async (user) => {
+        document.documentElement.classList.remove("has-session"); // ちらつき防止の一時非表示を解除
         if (user) {
           // ログイン済み
           btnLogin.style.display = "none";

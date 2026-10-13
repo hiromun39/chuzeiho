@@ -169,6 +169,9 @@ body {
   opacity: 0.7;
 }
 
+/* 保存済みセッションあり：認証確定までログインボタンを不可視（高さは維持） */
+.has-session #auth-login-box { visibility: hidden; }
+
 /* 未ログイン時：ログインボタン＋安心マイクロコピー（Google連携の心理障壁軽減） */
 .auth-login-box {
   display: flex;

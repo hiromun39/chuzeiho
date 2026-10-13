@@ -31,6 +31,16 @@
     disable_session_recording: true
   });
 </script>
+<script>
+/* ログイン前画面のちらつき防止：保存済みセッションがあればログインボタンを一時的に不可視にする。
+   3秒で必ず解除。app.js の認証コールバックでも解除される。 */
+(function(){try{var h=document.documentElement,f=false;
+for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);
+if(k&&k.indexOf("sb-")===0&&k.slice(-11)==="-auth-token"){f=true;break;}}
+if(f){h.classList.add("has-session");
+setTimeout(function(){h.classList.remove("has-session");},3000);}
+}catch(e){}})();
+</script>
 </head>
 <body>
 <div class="container">
