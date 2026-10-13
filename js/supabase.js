@@ -62,7 +62,7 @@
     // ログアウト
     async signOut() {
       if (!supabase) return;
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" }); // この端末だけログアウト（他端末のセッションは無効化しない）
     },
 
     // ---------- 課金API操作（Worker経由） ----------
@@ -97,6 +97,7 @@
       if (!res.ok) {
         const err = new Error(data.error || `エラー (${res.status})`);
         if (data.code) err.code = data.code;
+        err.status = res.status;
         throw err;
       }
       return data;

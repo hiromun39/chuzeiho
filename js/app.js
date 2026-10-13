@@ -890,6 +890,7 @@
   // - aiText: 式神解釈（あれば）を再表示するため
   // - hasShikigami: 式神解釈が表示済みか
   function saveDivinationState() {
+    if (isRestoreRender) return; // 復元描画中は書き戻さない（復元したら消える、を保証）
     try {
       if (!values || values.length !== 6) return; // 占い未完了時は保存しない
       const fortune = getFortuneText();
@@ -912,7 +913,7 @@
   // 保存された占い状態があれば、「占い結果画面」を再構築し、式神解釈（あれば）も再表示する
   // ・localStorage を主記憶とし（外部タブ遷移でも維持）、sessionStorage はフォールバック的に使う
   // ・占い結果（values）だけでなく、式神解釈テキスト（aiText）も復元する
-  function restoreDivinationState() {
+  function restoreDivinationState(maxAgeMs) {
     try {
       // ① まず sessionStorage（同一タブ高速復元用）を読み、無ければ localStorage（タブ跨ぎ用）も試す
       let raw = null;
@@ -928,6 +929,13 @@
       try { localStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
 
       if (!state || !state.values || state.values.length !== 6) return false;
+
+      // 古い（または保存時刻の無い旧形式の）スナップショットは復元せず破棄（削除は上で済み）
+      const age = Date.now() - new Date(state.savedAt || 0).getTime();
+      if (!state.savedAt || !(age >= 0 && age <= (maxAgeMs || 30 * 60 * 1000))) {
+        console.log("古い復元データのため破棄しました");
+        return false;
+      }
 
       // ── 多重復元ガード ──
       // DOMContentLoaded 内・pageshow で復元が重複して呼ばれ、showResult→saveHistory により
@@ -1034,6 +1042,7 @@
   }
 
   // 課金エリア全体の表示を更新。ログイン状態・プラン状態に応じて出し分ける。
+  let sessionExpiredNotice = false;
   async function updateAICreditDisplay() {
     const el = $("ai-credit");
     const billingSection = $("billing-section");
@@ -1042,13 +1051,16 @@
     const loggedIn = !!(window.AppSupabase && window.AppSupabase.user);
     if (!loggedIn) {
       // 未ログイン：購入導線は出さない（ログイン案内のみ）
-      el.innerHTML = `<span class="ai-credit-free">※ 式神の託宣にはログインが必要です。</span>`;
+      el.innerHTML = sessionExpiredNotice
+        ? `<span class="ai-credit-free">ログインの有効期限が切れました。お手数ですが、ログインし直してください。</span>`
+        : `<span class="ai-credit-free">※ 式神の託宣にはログインが必要です。</span>`;
       if (billingSection) billingSection.style.display = "none";
       if (billingArea) billingArea.style.display = "none";
       setAiLoginNote(true);
       return;
     }
 
+    sessionExpiredNotice = false;
     el.innerHTML = ``;
 
     // プラン状態を取得（初回無料・チケット・サブスク）
@@ -1056,6 +1068,18 @@
     try {
       plans = await window.AppSupabase.getPlans();
     } catch (e) {
+      // 認証エラー（他端末ログアウト等でセッション失効）：案内を出してローカルセッションを破棄。
+      // 破棄後は未ログイン分岐（getPlansを呼ばない）に入るのでループしない。
+      if (e && (e.status === 401 || e.status === 403 || /認証が無効または期限切れ/.test(e.message || ""))) {
+        console.error("セッション失効:", e.message);
+        sessionExpiredNotice = true;
+        document.documentElement.classList.remove("has-session");
+        const lb = $("auth-login-box");
+        if (lb) lb.style.display = "";
+        try { await window.AppSupabase.signOut(); } catch (_) {}
+        updateAICreditDisplay();
+        return;
+      }
       // /api/plans が失敗しても致命的でない。静かに購入導線だけ隠す
       console.error("プラン取得エラー:", e.message);
       if (billingSection) billingSection.style.display = "none";
@@ -2068,7 +2092,7 @@
         // ログインセッション確立・描画安定を待ってから、復元とチケット更新を行う
         setTimeout(async () => {
           // ① 占い結果＋式神解釈の状態を復元
-          const restored = restoreDivinationState();
+          const restored = restoreDivinationState(isPaidReturn ? 60 * 60 * 1000 : 30 * 60 * 1000);
           // ② 復元したら保存状態を消費（両ストレージから破棄）して、固着・再発を防ぐ
           try { sessionStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
           try { localStorage.removeItem(DIV_STATE_KEY); } catch (e) {}
